@@ -1,0 +1,88 @@
+{
+  "name": "Telar — Asistente de investigación",
+  "short_name": "Telar",
+  "description": "Análisis de bases de datos, encuestas, relatos y entrevistas para la investigación social. Los datos se procesan en tu computadora.",
+  "lang": "es",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#E9EDEC",
+  "theme_color": "#1F4C4E",
+  "categories": [
+    "education",
+    "productivity",
+    "utilities"
+  ],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "./",
+      "accept": {
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
+          ".xlsx"
+        ],
+        "application/vnd.ms-excel": [
+          ".xls"
+        ],
+        "text/csv": [
+          ".csv"
+        ],
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
+          ".docx"
+        ],
+        "application/x-spss-sav": [
+          ".sav"
+        ]
+      }
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "screenshots/escritorio-graficos.png",
+      "sizes": "1280x800",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Gráficos y filtros de una base de conflictos (proyecto de ejemplo, datos ficticios)"
+    },
+    {
+      "src": "screenshots/escritorio-entrevistas.png",
+      "sizes": "1280x800",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Lectura y codificación de una entrevista"
+    },
+    {
+      "src": "screenshots/celular-graficos.png",
+      "sizes": "824x1830",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Telar en el celular"
+    }
+  ],
+  "id": "./"
+}
