@@ -1,6 +1,6 @@
 // Telar: funcionamiento sin conexión.
 // Al publicar una versión nueva, cambiar VERSION (y APP_VERSION en index.html): la app avisa que hay una actualización.
-const VERSION = '0.9.1';
+const VERSION = '0.9.2';
 const CACHE = 'telar-' + VERSION;
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './sample-project.js',
@@ -11,7 +11,9 @@ const ASSETS = [
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './icons/apple-touch-icon.png', './icons/favicon.svg'
 ];
 self.addEventListener('install', e=>{
-  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)));
+  // cache:'reload' pide cada archivo al servidor, sin usar la copia temporal del navegador
+  // (GitHub Pages permite guardarla 10 minutos y, si no, se guardaría la versión anterior)
+  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS.map(u=>new Request(u, {cache:'reload'})))));
 });
 self.addEventListener('activate', e=>{
   e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('telar-') && k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));
@@ -21,6 +23,16 @@ self.addEventListener('message', e=>{ if(e.data && e.data.type==='SKIP_WAITING')
 self.addEventListener('fetch', e=>{
   const url = new URL(e.request.url);
   if(e.request.method!=='GET' || url.origin!==self.location.origin) return; // lo externo (CrossRef) va directo a la red
+  // la página principal: primero internet (así se ve enseguida lo último que se publicó); sin conexión, la copia guardada
+  const isPage = e.request.mode==='navigate' || /\/(index\.html)?$/.test(url.pathname);
+  if(isPage){
+    e.respondWith(fetch(e.request, {cache:'no-cache'}).then(res=>{
+      if(res.ok){ const copy = res.clone(); caches.open(CACHE).then(c=>c.put('./index.html', copy)); }
+      return res;
+    }).catch(()=>caches.match('./index.html').then(r=>r || caches.match('./'))));
+    return;
+  }
+  // librerías, tipografías e íconos: la copia guardada (cambian solo con cada versión)
   e.respondWith(
     caches.match(e.request, {ignoreSearch: true}).then(hit=>hit || fetch(e.request).then(res=>{
       if(res.ok && res.type==='basic'){ const copy = res.clone(); caches.open(CACHE).then(c=>c.put(e.request, copy)); }
