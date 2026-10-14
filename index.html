@@ -562,7 +562,7 @@ tbody tr:hover{background:var(--accent-bg)}
 
 <script>
 // ===== Versión de Telar (al publicar una nueva, cambiar acá y en sw.js) =====
-const APP_VERSION = '0.9.4';
+const APP_VERSION = '0.9.5';
 const APP_CHANNEL = 'beta';
 const APP_LABEL = 'Telar ' + APP_VERSION + ' ' + APP_CHANNEL;
 // Dirección del formulario de comentarios (ej. un Formulario de Google). Vacía: se explica cómo configurarla.
@@ -3929,14 +3929,18 @@ async function openOcrWorkspace(file){
   const draw = ()=>{
     cv.width = st.canvas.width; cv.height = st.canvas.height; cv.getContext('2d').drawImage(st.canvas, 0, 0);
     ov.setAttribute('viewBox', `0 0 ${st.canvas.width} ${st.canvas.height}`);
-    const sw = Math.max(2, st.canvas.width/400), fs = Math.max(16, st.canvas.width/45);
+    // grosor y tamaño constantes en pantalla: se calculan según cuánto se reduce la imagen al mostrarla
+    const shown = ov.getBoundingClientRect().width || st.canvas.width, k = st.canvas.width/shown;
+    const sw = 2.5*k, fs = 22*k;
+    const pr = document.getElementById('ocr-progress');
+    if(pr && !pr.dataset.busy) pr.textContent = st.zones.length ? `${st.zones.length} zona${st.zones.length>1?'s':''} marcada${st.zones.length>1?'s':''}. Tocá "Leer texto".` : '';
     ov.innerHTML = st.zones.map((z,i)=>`<rect x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" fill="rgba(47,107,110,.12)" stroke="#B5533C" stroke-width="${sw}"/><circle cx="${z.x+fs*0.7}" cy="${z.y+fs*0.7}" r="${fs*0.6}" fill="#B5533C"/><text x="${z.x+fs*0.7}" y="${z.y+fs*0.7}" fill="#fff" font-size="${fs*0.75}" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-weight="700">${i+1}</text>`).join('');
   };
   draw();
   // dibujar zonas con el mouse o el dedo
   let start = null, temp = null;
   const toImg = e=>{ const r = ov.getBoundingClientRect(); return {x: (e.clientX-r.left)*st.canvas.width/r.width, y: (e.clientY-r.top)*st.canvas.height/r.height}; };
-  ov.addEventListener('pointerdown', e=>{ e.preventDefault(); try{ ov.setPointerCapture(e.pointerId); }catch(_){} start = toImg(e); temp = document.createElementNS('http://www.w3.org/2000/svg','rect'); temp.setAttribute('fill','rgba(181,83,60,.15)'); temp.setAttribute('stroke','#B5533C'); temp.setAttribute('stroke-dasharray','8 6'); temp.setAttribute('stroke-width', Math.max(2, st.canvas.width/400)); ov.appendChild(temp); });
+  ov.addEventListener('pointerdown', e=>{ e.preventDefault(); try{ ov.setPointerCapture(e.pointerId); }catch(_){} start = toImg(e); temp = document.createElementNS('http://www.w3.org/2000/svg','rect'); temp.setAttribute('fill','rgba(181,83,60,.15)'); temp.setAttribute('stroke','#B5533C'); temp.setAttribute('stroke-dasharray','8 6'); temp.setAttribute('stroke-width', 2.5*st.canvas.width/(ov.getBoundingClientRect().width || st.canvas.width)); ov.appendChild(temp); });
   ov.addEventListener('pointermove', e=>{ if(!start) return; const p = toImg(e); temp.setAttribute('x', Math.min(p.x,start.x)); temp.setAttribute('y', Math.min(p.y,start.y)); temp.setAttribute('width', Math.abs(p.x-start.x)); temp.setAttribute('height', Math.abs(p.y-start.y)); });
   ov.addEventListener('pointerup', e=>{
     if(!start) return; const p = toImg(e);
@@ -3946,7 +3950,7 @@ async function openOcrWorkspace(file){
   });
   // zoom: la imagen se amplía dentro del recuadro (con barras de desplazamiento) para marcar las columnas con precisión
   let zoom = 1; const zw = document.getElementById('ocr-zoomwrap'), stage = document.getElementById('ocr-stage');
-  const setZoom = z=>{ const cx = (stage.scrollLeft + stage.clientWidth/2)/stage.scrollWidth, cy = (stage.scrollTop + stage.clientHeight/2)/stage.scrollHeight; zoom = Math.max(1, Math.min(5, z)); zw.style.width = (zoom*100)+'%'; stage.scrollLeft = cx*stage.scrollWidth - stage.clientWidth/2; stage.scrollTop = cy*stage.scrollHeight - stage.clientHeight/2; };
+  const setZoom = z=>{ const cx = (stage.scrollLeft + stage.clientWidth/2)/stage.scrollWidth, cy = (stage.scrollTop + stage.clientHeight/2)/stage.scrollHeight; zoom = Math.max(1, Math.min(5, z)); zw.style.width = (zoom*100)+'%'; stage.scrollLeft = cx*stage.scrollWidth - stage.clientWidth/2; stage.scrollTop = cy*stage.scrollHeight - stage.clientHeight/2; draw(); };
   document.getElementById('ocr-zin').onclick = ()=>setZoom(zoom*1.5);
   document.getElementById('ocr-zout').onclick = ()=>setZoom(zoom/1.5);
   document.getElementById('ocr-zfit').onclick = ()=>setZoom(1);
@@ -3959,7 +3963,7 @@ async function openOcrWorkspace(file){
   const setDone = on=>['ocr-save','ocr-copy','ocr-txt'].forEach(id=>{ document.getElementById(id).disabled = !on; });
   document.getElementById('ocr-run').onclick = async ()=>{
     if(!st.zones.length){ prog.textContent = 'Marcá al menos una zona (o usá "Toda la imagen").'; return; }
-    const btn = document.getElementById('ocr-run'); btn.disabled = true;
+    const btn = document.getElementById('ocr-run'); btn.disabled = true; prog.dataset.busy = '1';
     prog.textContent = ocrWorkerPromise ? 'Leyendo…' : 'Preparando el motor de OCR (la primera vez tarda un poco más)…';
     try{
       const res = await ocrRecognizeZones(st.canvas, st.zones, {enhance: document.getElementById('ocr-enh').checked, clean: document.getElementById('ocr-clean').checked},
@@ -3971,7 +3975,7 @@ async function openOcrWorkspace(file){
       prog.textContent = `Listo: ${words.length} palabras, confianza media ${Math.round(st.conf)}%${low ? `, ${low} dudosas (subrayadas)` : ''}.`;
       setDone(st.paras.length>0);
     }catch(err){ prog.textContent = 'No se pudo leer: '+err.message; }
-    finally{ btn.disabled = false; }
+    finally{ btn.disabled = false; delete prog.dataset.busy; }
   };
   const plain = ()=>[...txtEl.querySelectorAll('p')].map(p=>p.innerText.replace(/\s+/g,' ').trim()).filter(Boolean).join('\n\n') || txtEl.innerText.trim();
   document.getElementById('ocr-copy').onclick = async ()=>{ try{ await navigator.clipboard.writeText(plain()); document.getElementById('ocr-msg').textContent = 'Texto copiado.'; }catch(e){ document.getElementById('ocr-msg').textContent = 'No se pudo copiar automáticamente: seleccioná el texto y copialo.'; } };
