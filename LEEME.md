@@ -1,4 +1,4 @@
-# Telar · Asistente de investigación — versión 0.9.3 (beta)
+# Telar · Asistente de investigación — versión 0.9.4 (beta)
 
 Telar integra el análisis de bases de datos y encuestas, relatos fechados, entrevistas y codificación cualitativa en una sola herramienta. Funciona entera en el navegador: **los archivos de cada persona se procesan en su computadora y no se envían a ningún servidor.**
 
@@ -10,6 +10,7 @@ Telar integra el análisis de bases de datos y encuestas, relatos fechados, entr
 | `manifest.webmanifest`, `sw.js`, `icons/` | Lo que permite instalarla y usarla sin conexión |
 | `vendor/` | Librerías incluidas (Excel, gráficos, Word, PDF), para no depender de internet |
 | `fonts/` | Tipografías incluidas (no se consulta a Google Fonts) |
+| `vendor/tesseract/` | Motor de OCR (texto desde imágenes) y datos del idioma español. Se descarga solo la primera vez que se usa |
 | `sample-project.js` | El proyecto de ejemplo, con datos ficticios |
 | `LICENCIAS-DE-TERCEROS.txt` | Licencias de las librerías y tipografías incluidas |
 
@@ -34,6 +35,10 @@ Con la app publicada:
 - Instalada en Chrome o Edge de escritorio, se puede abrir un `.xlsx`, `.csv`, `.docx` o `.sav` directamente con Telar.
 
 Si más adelante el Instituto ofrece un servidor propio, sirve cualquier hosting estático con `https`: se sube la misma carpeta.
+
+## Texto desde imágenes (OCR)
+
+Las fotos, capturas de pantalla y PDF escaneados se leen con el motor Tesseract, incluido en `vendor/tesseract/`. Se suben desde "Cargar datos", se pegan con Ctrl+V o se abren con el botón **📷 Texto desde imagen (OCR)** de la solapa Relatos. Todo se procesa en la computadora. El OCR funciona con la app publicada o instalada; abriendo `index.html` con doble clic, el navegador no permite cargar el motor.
 
 ## Configurar el formulario de comentarios
 
@@ -84,7 +89,7 @@ Quienes ya tengan la app abierta o instalada ven el aviso **"Hay una versión nu
 
 ## Cómo citarla
 
-Telar · Asistente de investigación, versión 0.9.3 (beta). La versión figura también en cada informe, anexo metodológico y archivo exportado.
+Telar · Asistente de investigación, versión 0.9.4 (beta). La versión figura también en cada informe, anexo metodológico y archivo exportado.
 
 ## Licencias
 
