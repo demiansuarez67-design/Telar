@@ -43,11 +43,17 @@
     {
       "action": "./",
       "accept": {
+        "application/x-telar+json": [
+          ".telar"
+        ],
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
           ".xlsx"
         ],
         "application/vnd.ms-excel": [
           ".xls"
+        ],
+        "application/vnd.oasis.opendocument.spreadsheet": [
+          ".ods"
         ],
         "text/csv": [
           ".csv"
@@ -55,8 +61,17 @@
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
           ".docx"
         ],
+        "application/vnd.oasis.opendocument.text": [
+          ".odt"
+        ],
+        "text/plain": [
+          ".txt"
+        ],
         "application/x-spss-sav": [
           ".sav"
+        ],
+        "application/x-stata-dta": [
+          ".dta"
         ]
       }
     }

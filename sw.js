@@ -1,6 +1,6 @@
 // Telar: funcionamiento sin conexión.
 // Al publicar una versión nueva, cambiar VERSION (y APP_VERSION en index.html): la app avisa que hay una actualización.
-const VERSION = '0.9.6';
+const VERSION = '0.10.0';
 const CACHE = 'telar-' + VERSION;
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './sample-project.js',

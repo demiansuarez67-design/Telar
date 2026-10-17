@@ -1,4 +1,4 @@
-# Telar · Asistente de investigación — versión 0.9.6 (beta)
+# Telar · Asistente de investigación — versión 0.10.0 (beta)
 
 Telar integra el análisis de bases de datos y encuestas, relatos fechados, entrevistas y codificación cualitativa en una sola herramienta. Funciona entera en el navegador: **los archivos de cada persona se procesan en su computadora y no se envían a ningún servidor.**
 
@@ -35,6 +35,14 @@ Con la app publicada:
 - Instalada en Chrome o Edge de escritorio, se puede abrir un `.xlsx`, `.csv`, `.docx` o `.sav` directamente con Telar.
 
 Si más adelante el Instituto ofrece un servidor propio, sirve cualquier hosting estático con `https`: se sube la misma carpeta.
+
+## Guardar el proyecto en un archivo (.telar)
+
+Con **💾 Guardar** (o Ctrl+S) todo el proyecto se guarda en un archivo `.telar`, que se abre con **📂 Abrir**. En Chrome y Edge se guarda siempre sobre el mismo archivo y, si se activa, automáticamente mientras se trabaja; en otros navegadores se descarga una copia cada vez. Puede protegerse con contraseña. Las sesiones `.json` exportadas con versiones anteriores también se abren con **📂 Abrir**.
+
+## Formatos que lee
+
+Planillas `.xlsx`, `.xls`, `.ods` y `.csv`; SPSS `.sav`; Stata `.dta` (versiones 8 a 18); documentos `.docx`, `.odt` y `.txt`; imágenes y PDF escaneados (OCR). El informe se descarga en Word (`.docx`), PDF o HTML.
 
 ## Texto desde imágenes (OCR)
 
@@ -89,7 +97,7 @@ Quienes ya tengan la app abierta o instalada ven el aviso **"Hay una versión nu
 
 ## Cómo citarla
 
-Telar · Asistente de investigación, versión 0.9.6 (beta). La versión figura también en cada informe, anexo metodológico y archivo exportado.
+Telar · Asistente de investigación, versión 0.10.0 (beta). La versión figura también en cada informe, anexo metodológico y archivo exportado.
 
 ## Licencias
 

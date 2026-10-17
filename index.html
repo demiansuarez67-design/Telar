@@ -162,13 +162,13 @@ tbody tr:hover{background:var(--accent-bg)}
     </div>
     <div class="top-actions">
       <button type="button" class="mini-export" id="install-btn" style="display:none;padding:8px 12px" title="Instalar Telar como aplicación en esta computadora o celular">📲 Instalar</button>
-      <button type="button" class="go" id="export-session-btn" title="Descargar todo el proyecto (datos, configuración, notas, informe y referencias) como respaldo o para pasarlo a otra computadora">⭳ Exportar sesión</button>
-      <label class="go" style="cursor:pointer" title="Abrir una sesión exportada (.json)">⭱ Importar sesión<input type="file" id="import-session-input" accept=".json" style="display:none"></label>
+      <button type="button" class="go" id="export-session-btn" title="Guardar todo el proyecto en un archivo .telar (Ctrl+S)">💾 Guardar</button>
+      <button type="button" class="go" id="open-project-btn" title="Abrir un proyecto guardado (.telar) o una sesión exportada (.json)">📂 Abrir</button><input type="file" id="import-session-input" accept=".telar,.json" style="display:none">
     </div>
   </header>
 
   <div class="beta-banner" id="beta-banner" style="display:none" role="note">
-    <div style="flex:1"><strong>Estás usando una versión beta de Telar.</strong> Ya se puede usar para trabajar, pero todavía puede tener errores y algunas funciones pueden cambiar. Tus datos se procesan en tu computadora y no se envían a ningún servidor; aun así, exportá la sesión cada tanto como respaldo. Tus comentarios ayudan a mejorarla: <button type="button" class="gl-link" id="beta-banner-fb">dejar un comentario</button> · <button type="button" class="gl-link" id="beta-banner-sample">probar con un proyecto de ejemplo</button>.</div>
+    <div style="flex:1"><strong>Estás usando una versión beta de Telar.</strong> Ya se puede usar para trabajar, pero todavía puede tener errores y algunas funciones pueden cambiar. Tus datos se procesan en tu computadora y no se envían a ningún servidor; aun así, guardá el proyecto en un archivo cada tanto (💾 Guardar) como respaldo. Tus comentarios ayudan a mejorarla: <button type="button" class="gl-link" id="beta-banner-fb">dejar un comentario</button> · <button type="button" class="gl-link" id="beta-banner-sample">probar con un proyecto de ejemplo</button>.</div>
     <button type="button" class="mini-export" id="beta-banner-close" aria-label="Cerrar el aviso">Entendido</button>
   </div>
 
@@ -178,14 +178,15 @@ tbody tr:hover{background:var(--accent-bg)}
       <span id="upload-summary" class="hint" style="margin:0;display:none"></span>
       <span class="hint" style="margin:0 0 0 auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap"><label for="project-select">Proyecto:</label> <select id="project-select" style="max-width:240px;padding:4px 8px"></select> <button type="button" class="mini-export" id="project-new-btn" title="Crear otro proyecto con sus propios datos y configuración">+ Nuevo</button> <button type="button" class="mini-export" id="project-settings-btn">⚙ Configurar proyecto</button></span>
     </div>
-    <p id="private-banner" style="display:none;margin:10px 0 0;padding:8px 10px;border:1px solid var(--teal);border-radius:4px;background:var(--accent-bg);color:var(--teal-d);font-size:.85rem">🔒 Modo privado: los datos de este proyecto no se guardan en este navegador y se pierden al cerrar la página. Para conservarlos, usá "Exportar sesión" (podés protegerla con contraseña).</p>
+    <p id="file-status" class="hint" style="margin:6px 0 0;font-size:.82rem" aria-live="polite"></p>
+    <p id="private-banner" style="display:none;margin:10px 0 0;padding:8px 10px;border:1px solid var(--teal);border-radius:4px;background:var(--accent-bg);color:var(--teal-d);font-size:.85rem">🔒 Modo privado: los datos de este proyecto no se guardan en este navegador y se pierden al cerrar la página. Para conservarlos, guardalos en un archivo con "💾 Guardar" (podés protegerlo con contraseña).</p>
     <p id="storage-warning" role="alert" style="display:none;margin:10px 0 0;padding:8px 10px;border:1px solid var(--rust);border-radius:4px;color:var(--rust);font-size:.85rem"></p>
     <div id="upload-body" style="margin-top:6px">
-    <p class="hint">Subí uno o varios archivos (.xlsx, .xls, .csv, .sav de SPSS o .docx). Después de cargar una tabla vas a poder revisar cómo se leyó cada columna y corregirlo. Las fotos, capturas de pantalla y PDF escaneados se leen con OCR (también podés pegar una captura con Ctrl+V).</p>
+    <p class="hint">Subí uno o varios archivos: planillas (.xlsx, .xls, .ods, .csv), SPSS (.sav), Stata (.dta) o documentos (.docx, .odt, .txt). Después de cargar una tabla vas a poder revisar cómo se leyó cada columna y corregirlo. Las fotos, capturas de pantalla y PDF escaneados se leen con OCR (también podés pegar una captura con Ctrl+V).</p>
     <label class="dz" id="dz-upload" style="display:block">
       <strong>Arrastrá tus archivos acá o hacé clic</strong>
       <span>Podés soltar varios a la vez</span>
-      <input type="file" accept=".xlsx,.xls,.csv,.docx,.sav,.jpg,.jpeg,.png,.webp,.pdf" id="file-upload" multiple>
+      <input type="file" accept=".xlsx,.xls,.ods,.csv,.docx,.odt,.txt,.sav,.dta,.telar,.jpg,.jpeg,.png,.webp,.pdf" id="file-upload" multiple>
     </label>
     <p class="hint helptext" style="margin-top:10px" data-help-for="upload-card-toggle">Los archivos que cargues quedan guardados en este navegador (no se suben a ningún servidor) para no tener que resubirlos cada vez que abrís esta página. <span id="clear-session-btn" style="color:var(--rust);cursor:pointer;text-decoration:underline">Vaciar los datos de este proyecto</span></p>
     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
@@ -562,7 +563,7 @@ tbody tr:hover{background:var(--accent-bg)}
 
 <script>
 // ===== Versión de Telar (al publicar una nueva, cambiar acá y en sw.js) =====
-const APP_VERSION = '0.9.6';
+const APP_VERSION = '0.10.0';
 const APP_CHANNEL = 'beta';
 const APP_LABEL = 'Telar ' + APP_VERSION + ' ' + APP_CHANNEL;
 // Dirección del formulario de comentarios (ej. un Formulario de Google). Vacía: se explica cómo configurarla.
@@ -661,6 +662,7 @@ let persistTimer = null;
 let persistRequested = false;
 function persistSession(){
   if(!sessionReady || sessionClearing) return;
+  markFileDirty();
   clearTimeout(persistTimer);
   persistTimer = setTimeout(writeSessionNow, 300);
 }
@@ -696,9 +698,9 @@ async function writeSessionNow(){
     console.error('No se pudo guardar en IndexedDB:', err);
     try{
       localStorage.setItem('acq_session_fallback', JSON.stringify(isPrivate() ? storageBundle() : bundle, jsonReplacer));
-      setStorageWarning('⚠ El almacenamiento principal del navegador no está disponible; la sesión se guardó en el almacenamiento de respaldo, que tiene poca capacidad. Exportá la sesión (.json) para no perder trabajo.');
+      setStorageWarning('⚠ El almacenamiento principal del navegador no está disponible; la sesión se guardó en el almacenamiento de respaldo, que tiene poca capacidad. Guardá el proyecto en un archivo (💾 Guardar) para no perder trabajo.');
     }catch(err2){
-      setStorageWarning('⚠ No se pudo guardar la sesión en este navegador ('+((err2&&err2.name)||'error')+'). Lo que hagas desde ahora se pierde al cerrar la página: exportá la sesión (.json) como respaldo.');
+      setStorageWarning('⚠ No se pudo guardar la sesión en este navegador ('+((err2&&err2.name)||'error')+'). Lo que hagas desde ahora se pierde al cerrar la página: guardá el proyecto en un archivo (💾 Guardar) (.json) como respaldo.');
     }
   }
 }
@@ -731,6 +733,7 @@ async function switchProject(id){
     refreshAllAfterSession();
     setUploadCollapsed(Object.keys(datasets).length + Object.keys(qualDocs).length > 0);
     await saveProjectsIndex();
+    await loadFileMeta();
   }catch(err){
     console.error(err); alert('No se pudo abrir el proyecto: '+err.message);
   }finally{ sessionReady = true; hideBusy(); }
@@ -758,6 +761,7 @@ async function deleteCurrentProject(){
   sessionReady = true;
   refreshAllAfterSession();
   await saveProjectsIndex();
+  await loadFileMeta();
 }
 function openNewProjectDialog(){
   const tplOpts = Object.entries(TEMPLATES).map(([k,v])=>`<option value="${k}">${esc(v.label)}</option>`).join('');
@@ -2085,14 +2089,178 @@ function readSav(buf){
 }
 function fmtSavNum(x){ if(x==null || !isFinite(x)) return String(x); return Number.isInteger(x) ? String(x) : String(+x.toPrecision(12)); }
 /* ===== LECTOR DE SPSS (fin) ===== */
+/* ===== LECTOR DE STATA (.dta) (inicio) ===== */
+// Formatos 113–115 (Stata 8–12, binario) y 117–119 (Stata 13 en adelante, con etiquetas tipo XML).
+// Devuelve la misma estructura que el lector de SPSS: {vars, rows, weightVar, fileLabel}.
+function readDta(u8){
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  const asc = (p, n)=>{ let s = ''; for(let i=0;i<n;i++) s += String.fromCharCode(u8[p+i]); return s; };
+  return asc(0, 11)==='<stata_dta>' ? readDtaNew(u8, dv, asc) : readDtaOld(u8, dv);
+}
+function dtaText(u8, p, n, utf8){
+  let e = p; while(e < p+n && u8[e]!==0) e++;
+  return new TextDecoder(utf8 ? 'utf-8' : 'windows-1252').decode(u8.subarray(p, e));
+}
+// valores faltantes de Stata (".", ".a" … ".z"): por encima de un umbral según el tipo
+function dtaNum(dv, p, kind, le){
+  switch(kind){
+    case 'byte':  { const v = dv.getInt8(p); return v > 100 ? null : v; }
+    case 'int':   { const v = dv.getInt16(p, le); return v > 32740 ? null : v; }
+    case 'long':  { const v = dv.getInt32(p, le); return v > 2147483620 ? null : v; }
+    case 'float': { const v = dv.getFloat32(p, le); return (!isFinite(v) || v >= 1.7014118346046923e38) ? null : +v.toPrecision(7); }
+    case 'double':{ const v = dv.getFloat64(p, le); return (!isFinite(v) || v >= 8.98846567431158e307) ? null : v; }
+  }
+  return null;
+}
+// fechas: %td = días desde el 1/1/1960; %tc = milisegundos desde el 1/1/1960
+function dtaDateKind(fmt){ const f = String(fmt||'').replace(/^%-?/, ''); if(/^t?d/.test(f) && !/^tc|^tC/.test(f)) return /^td|^d/.test(f) ? 'td' : null; if(/^t[cC]/.test(f)) return 'tc'; return null; }
+function dtaToDate(v, kind){
+  if(v==null) return null;
+  if(kind==='td'){ const d = new Date(Date.UTC(1960,0,1) + v*86400000); return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()); }
+  const d = new Date(Date.UTC(1960,0,1) + v); return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds());
+}
+function dtaBuild(cols, rowsRaw, labelTables, fileLabel){
+  const vars = cols.map(c=>{
+    const tab = c.vlName ? labelTables[c.vlName] : null;
+    const valueLabels = {};
+    if(tab && c.kind!=='str') Object.keys(tab).forEach(k=>{ valueLabels[k] = tab[k]; });
+    const isDate = !!c.dateKind;
+    return {name: c.name, label: c.label || '', type: c.kind==='str' ? 'str' : 'num', valueLabels, missingValues: [], missingRange: null,
+      measure: c.kind==='str' ? 'nominal' : (Object.keys(valueLabels).length ? 'nominal' : 'escala'), isDate};
+  });
+  return {vars, rows: rowsRaw, weightVar: null, fileLabel: fileLabel || ''};
+}
+function dtaLabelTable(u8, dv, p, le, utf8){
+  const n = dv.getUint32(p, le), txtlen = dv.getUint32(p+4, le);
+  const offs = [], vals = []; let q = p + 8;
+  for(let i=0;i<n;i++){ offs.push(dv.getUint32(q, le)); q += 4; }
+  for(let i=0;i<n;i++){ vals.push(dv.getInt32(q, le)); q += 4; }
+  const txt0 = q, tab = {};
+  for(let i=0;i<n;i++) if(offs[i] < txtlen) tab[fmtSavNum(vals[i])] = dtaText(u8, txt0 + offs[i], txtlen - offs[i], utf8);
+  return tab;
+}
+function readDtaNew(u8, dv, asc){
+  let p = 0;
+  const expect = tag=>{ if(asc(p, tag.length)!==tag) throw new Error('el archivo no tiene la estructura esperada de Stata ('+tag+')'); p += tag.length; };
+  expect('<stata_dta><header><release>');
+  const rel = +asc(p, 3); p += 3;
+  if(![117,118,119].includes(rel)) throw new Error('versión de Stata no reconocida ('+rel+')');
+  expect('</release><byteorder>'); const le = asc(p, 3)==='LSF'; p += 3;
+  expect('</byteorder><K>');
+  const K = rel===119 ? dv.getUint32(p, le) : dv.getUint16(p, le); p += rel===119 ? 4 : 2;
+  expect('</K><N>');
+  const N = rel===117 ? dv.getUint32(p, le) : Number(dv.getBigUint64(p, le)); p += rel===117 ? 4 : 8;
+  expect('</N><label>');
+  const ll = rel===117 ? u8[p] : dv.getUint16(p, le); p += rel===117 ? 1 : 2;
+  const utf8 = rel >= 118;
+  const fileLabel = dtaText(u8, p, ll, utf8); p += ll;
+  expect('</label><timestamp>'); p += 1 + u8[p];
+  expect('</timestamp></header><map>');
+  const map = []; for(let i=0;i<14;i++){ map.push(Number(dv.getBigUint64(p, le))); p += 8; }
+  const at = (i, tag)=>{ p = map[i]; expect(tag); return p; };
+  const nameLen = rel===117 ? 33 : 129, fmtLen = rel===117 ? 49 : 57, vlLen = rel===117 ? 33 : 129, labLen = rel===117 ? 81 : 321;
+  const cols = [];
+  let q = at(2, '<variable_types>');
+  for(let i=0;i<K;i++){ const t = dv.getUint16(q, le); q += 2;
+    const kind = t<=2045 ? 'str' : t===32768 ? 'strl' : t===65526 ? 'double' : t===65527 ? 'float' : t===65528 ? 'long' : t===65529 ? 'int' : t===65530 ? 'byte' : null;
+    if(!kind) throw new Error('tipo de variable de Stata no reconocido ('+t+')');
+    cols.push({kind: kind==='strl' ? 'str' : kind, strl: kind==='strl', width: t<=2045 ? t : kind==='strl' ? 8 : {double:8, float:4, long:4, int:2, byte:1}[kind]});
+  }
+  q = at(3, '<varnames>'); cols.forEach(c=>{ c.name = dtaText(u8, q, nameLen, utf8); q += nameLen; });
+  q = at(5, '<formats>'); cols.forEach(c=>{ c.format = dtaText(u8, q, fmtLen, utf8); c.dateKind = c.kind==='str' ? null : dtaDateKind(c.format); q += fmtLen; });
+  q = at(6, '<value_label_names>'); cols.forEach(c=>{ c.vlName = dtaText(u8, q, vlLen, utf8); q += vlLen; });
+  q = at(7, '<variable_labels>'); cols.forEach(c=>{ c.label = dtaText(u8, q, labLen, utf8); q += labLen; });
+  // textos largos (strL): se indexan por (v, o)
+  const strls = {};
+  q = at(10, '<strls>');
+  while(asc(q, 3)==='GSO'){
+    const v = dv.getUint32(q+3, le), o = rel===117 ? dv.getUint32(q+7, le) : Number(dv.getBigUint64(q+7, le));
+    let r = q + 7 + (rel===117 ? 4 : 8); const t = u8[r], len = dv.getUint32(r+1, le); r += 5;
+    strls[v+','+o] = t===130 ? dtaText(u8, r, len, utf8) : new TextDecoder(utf8 ? 'utf-8' : 'windows-1252').decode(u8.subarray(r, r+len));
+    q = r + len;
+  }
+  // etiquetas de valores
+  const tables = {};
+  q = at(11, '<value_labels>');
+  while(asc(q, 5)==='<lbl>'){
+    q += 5; const len = dv.getUint32(q, le); q += 4;
+    const name = dtaText(u8, q, nameLen, utf8); q += nameLen + 3;
+    tables[name] = dtaLabelTable(u8, dv, q, le, utf8); q += len;
+    if(asc(q, 6)!=='</lbl>') throw new Error('etiquetas de valores de Stata mal formadas'); q += 6;
+  }
+  // datos
+  q = at(9, '<data>');
+  const rows = [];
+  for(let r=0;r<N;r++){
+    const row = {};
+    for(const c of cols){
+      let v;
+      if(c.strl){
+        let vv, oo;
+        if(rel===117){ vv = dv.getUint32(q, le); oo = dv.getUint32(q+4, le); }
+        else if(rel===118){ vv = dv.getUint16(q, le); oo = le ? dv.getUint16(q+2, true) + dv.getUint32(q+4, true)*65536 : dv.getUint32(q+2, false)*65536 + dv.getUint16(q+6, false); }
+        else { vv = le ? u8[q] | (u8[q+1]<<8) | (u8[q+2]<<16) : (u8[q]<<16) | (u8[q+1]<<8) | u8[q+2]; oo = le ? u8[q+3] + u8[q+4]*256 + dv.getUint16(q+5, true)*65536 + u8[q+7]*16777216*256 : 0; if(!le){ let x = 0; for(let i=3;i<8;i++) x = x*256 + u8[q+i]; oo = x; } }
+        v = (vv===0 && oo===0) ? '' : (strls[vv+','+oo] || '');
+      } else if(c.kind==='str') v = dtaText(u8, q, c.width, utf8);
+      else v = dtaNum(dv, q, c.kind, le);
+      q += c.width;
+      if(c.kind==='str'){ v = v.replace(/\s+$/,''); row[c.name] = v==='' ? null : v; }
+      else row[c.name] = c.dateKind ? dtaToDate(v, c.dateKind) : v;
+    }
+    rows.push(row);
+  }
+  return dtaBuild(cols, rows, tables, fileLabel);
+}
+function readDtaOld(u8, dv){
+  const rel = u8[0];
+  if(![113,114,115].includes(rel)) throw new Error('formato de Stata no reconocido (versión '+rel+'). Guardalo desde Stata con "saveold" o en un formato más reciente.');
+  const le = u8[1]===2;
+  const K = dv.getUint16(4, le), N = dv.getUint32(6, le);
+  const fileLabel = dtaText(u8, 10, 81, false);
+  let p = 10 + 81 + 18;
+  const cols = [];
+  for(let i=0;i<K;i++){ const t = u8[p+i];
+    const kind = t<=244 ? 'str' : t===251 ? 'byte' : t===252 ? 'int' : t===253 ? 'long' : t===254 ? 'float' : t===255 ? 'double' : null;
+    if(!kind) throw new Error('tipo de variable de Stata no reconocido ('+t+')');
+    cols.push({kind, width: t<=244 ? t : {byte:1, int:2, long:4, float:4, double:8}[kind]});
+  }
+  p += K;
+  cols.forEach(c=>{ c.name = dtaText(u8, p, 33, false); p += 33; });
+  p += 2*(K+1);
+  const fmtLen = rel===113 ? 12 : 49;
+  cols.forEach(c=>{ c.format = dtaText(u8, p, fmtLen, false); c.dateKind = c.kind==='str' ? null : dtaDateKind(c.format); p += fmtLen; });
+  cols.forEach(c=>{ c.vlName = dtaText(u8, p, 33, false); p += 33; });
+  cols.forEach(c=>{ c.label = dtaText(u8, p, 81, false); p += 81; });
+  for(;;){ const t = u8[p], len = dv.getUint32(p+1, le); p += 5; if(t===0 && len===0) break; p += len; if(p >= u8.length) throw new Error('archivo de Stata incompleto'); }
+  const rows = [];
+  for(let r=0;r<N;r++){
+    const row = {};
+    for(const c of cols){
+      let v = c.kind==='str' ? dtaText(u8, p, c.width, false) : dtaNum(dv, p, c.kind, le);
+      p += c.width;
+      if(c.kind==='str'){ v = v.replace(/\s+$/,''); row[c.name] = v==='' ? null : v; }
+      else row[c.name] = c.dateKind ? dtaToDate(v, c.dateKind) : v;
+    }
+    rows.push(row);
+  }
+  const tables = {};
+  while(p + 4 + 33 + 3 <= u8.length){
+    const len = dv.getUint32(p, le); const name = dtaText(u8, p+4, 33, false); p += 4 + 33 + 3;
+    if(p + len > u8.length) break;
+    tables[name] = dtaLabelTable(u8, dv, p, le, false); p += len;
+  }
+  return dtaBuild(cols, rows, tables, fileLabel);
+}
+/* ===== LECTOR DE STATA (fin) ===== */
+
 
 // Carga de un .sav: el diccionario de SPSS se traduce a tipos de columna, etiquetas, perdidos, orden y ponderador
-function loadSavFile(file, statusEl){
+function loadSavFile(file, statusEl, opts={}){ // también Stata (.dta), con opts.read = readDta
   const heavy = file.size > 300000;
   readFileAs(file, 'buffer').then(async buf=>{
     if(heavy){ showBusy('Leyendo "'+file.name+'"…'); await nextPaint(); }
     try{
-      const sav = readSav(new Uint8Array(buf));
+      const sav = (opts.read || readSav)(new Uint8Array(buf));
       const allCols = sav.vars.map(v=>v.name);
       const rows = sav.rows.map(r=>{ r.__AñoBase = null; return r; });
       const hints = {};
@@ -2114,11 +2282,11 @@ function loadSavFile(file, statusEl){
         }
         hints[v.name] = h;
       });
-      const base = file.name.replace(/\.sav$/i,'');
+      const base = file.name.replace(/\.(sav|dta)$/i,'');
       const key = uniqueKey(datasets, 'ds_'+normColName(base).replace(/[^a-z0-9]+/g,'_'), file.name);
       statusEl.dataset.key = key;
       registerDataset(key, sav.fileLabel || base, rows, allCols, file.name, null, hints);
-      statusEl.innerHTML = `<span>✓ ${esc(sav.fileLabel || base)} (SPSS): ${rows.length} casos, ${allCols.length} variables${sav.weightVar ? ' — ponderador "'+esc(sav.weightVar)+'"' : ''}</span><button class="del-btn" title="Quitar">✕</button>`;
+      statusEl.innerHTML = `<span>✓ ${esc(sav.fileLabel || base)} (${opts.kind || 'SPSS'}): ${rows.length} casos, ${allCols.length} variables${sav.weightVar ? ' — ponderador "'+esc(sav.weightVar)+'"' : ''}</span><button class="del-btn" title="Quitar">✕</button>`;
       statusEl.querySelector('.del-btn').onclick = ()=>removeDataset(key, statusEl);
       if(heavy){ setBusy('Armando gráficos y filtros…'); await nextPaint(); }
       buildUI();
@@ -3715,6 +3883,438 @@ function bindTeamPanel(){
 }
 /* ===== TRABAJO EN EQUIPO: interfaz (fin) ===== */
 
+/* ===== DOCUMENTOS DE LIBREOFFICE (.odt) Y TEXTO PLANO (.txt) (inicio) ===== */
+// Se convierten al mismo HTML que produce la lectura de Word, para reutilizar el reconocimiento
+// de relatos fechados, entrevistas y tablas.
+const ODF_TEXT = 'urn:oasis:names:tc:opendocument:xmlns:text:1.0', ODF_TABLE = 'urn:oasis:names:tc:opendocument:xmlns:table:1.0', ODF_OFFICE = 'urn:oasis:names:tc:opendocument:xmlns:office:1.0';
+function zipEntryText(u8, path){
+  const z = XLSX.CFB.read(u8, {type:'array'});
+  const f = XLSX.CFB.find(z, '/'+path);
+  if(!f) return null;
+  return new TextDecoder('utf-8').decode(f.content instanceof Uint8Array ? f.content : new Uint8Array(f.content));
+}
+function odtXmlToHtml(xml){
+  const doc = new DOMParser().parseFromString(xml, 'application/xml');
+  if(doc.getElementsByTagName('parsererror').length) throw new Error('el documento no se pudo interpretar');
+  const body = doc.getElementsByTagNameNS(ODF_OFFICE, 'text')[0];
+  if(!body) throw new Error('el archivo no contiene texto');
+  // texto de un párrafo: espacios repetidos (text:s), tabulaciones, saltos de línea; se omiten las notas al pie
+  const inline = node=>{
+    let s = '';
+    node.childNodes.forEach(ch=>{
+      if(ch.nodeType===3){ s += esc(ch.nodeValue); return; }
+      if(ch.nodeType!==1) return;
+      const ln = ch.localName;
+      if(ch.namespaceURI===ODF_TEXT){
+        if(ln==='s'){ s += ' '.repeat(+(ch.getAttributeNS(ODF_TEXT,'c')||1)); return; }
+        if(ln==='tab'){ s += ' '; return; }
+        if(ln==='line-break'){ s += '<br>'; return; }
+        if(ln==='note' || ln==='bookmark' || ln==='bookmark-start' || ln==='bookmark-end' || ln==='soft-page-break') return;
+      }
+      s += inline(ch);
+    });
+    return s;
+  };
+  const block = node=>{
+    let h = '';
+    node.childNodes.forEach(ch=>{
+      if(ch.nodeType!==1) return;
+      const ns = ch.namespaceURI, ln = ch.localName;
+      if(ns===ODF_TEXT && (ln==='p' || ln==='h')){ h += '<p>'+inline(ch)+'</p>'; return; }
+      if(ns===ODF_TABLE && ln==='table'){
+        // filas de esta tabla (también dentro de grupos de encabezado o de filas), sin entrar a tablas anidadas
+        const rowsOf = el=>[...el.childNodes].filter(c=>c.nodeType===1 && c.namespaceURI===ODF_TABLE).flatMap(c=>
+          c.localName==='table-row' ? [c] : /^table-(header-rows|rows|row-group)$/.test(c.localName) ? rowsOf(c) : []);
+        h += '<table>' + rowsOf(ch).map(tr=>'<tr>' + [...tr.childNodes].filter(c=>c.nodeType===1 && c.namespaceURI===ODF_TABLE && c.localName==='table-cell').map(td=>{
+          const rep = Math.min(50, +(td.getAttributeNS(ODF_TABLE, 'number-columns-repeated')||1));
+          return ('<td>'+block(td)+'</td>').repeat(rep);
+        }).join('') + '</tr>').join('') + '</table>';
+        return;
+      }
+      if(ns===ODF_TEXT && ln==='note') return;
+      h += block(ch); // listas, secciones, cuadros de texto: se recorre su contenido
+    });
+    return h;
+  };
+  return block(body);
+}
+function txtToHtml(text){
+  // cada renglón con texto es un párrafo (así se escriben habitualmente relatos y desgrabaciones en texto plano)
+  return text.replace(/\r\n?/g, '\n').split('\n').map(l=>l.trim()).filter(Boolean).map(l=>'<p>'+esc(l)+'</p>').join('');
+}
+function loadOdtFile(file, statusEl){
+  readFileAs(file, 'buffer').then(buf=>{
+    try{
+      const xml = zipEntryText(new Uint8Array(buf), 'content.xml');
+      if(!xml) throw new Error('no es un documento de LibreOffice válido');
+      loadWordFile(file, statusEl, {html: odtXmlToHtml(xml)});
+    }catch(err){
+      statusEl.innerHTML = `<span>✗ Error al leer "${esc(file.name)}": ${esc(err.message)}</span><button class="del-btn" title="Descartar">✕</button>`;
+      statusEl.querySelector('.del-btn').onclick = ()=>{ statusEl.remove(); updateUploadToggle(); };
+    }
+  });
+}
+function loadTxtFile(file, statusEl){
+  readFileAs(file, 'buffer').then(buf=>{
+    const html = txtToHtml(decodeCsvBytes(new Uint8Array(buf)));
+    if(!html){ statusEl.innerHTML = `<span>✗ "${esc(file.name)}" está vacío</span><button class="del-btn" title="Descartar">✕</button>`; statusEl.querySelector('.del-btn').onclick = ()=>{ statusEl.remove(); updateUploadToggle(); }; return; }
+    loadWordFile(file, statusEl, {html});
+  });
+}
+/* ===== DOCUMENTOS DE LIBREOFFICE Y TEXTO PLANO (fin) ===== */
+
+/* ===== ARCHIVO DE PROYECTO (.telar) (inicio) ===== */
+// El proyecto completo se guarda en un archivo propio que la persona ubica donde quiera. En Chrome y Edge se
+// puede guardar siempre sobre el mismo archivo (y automáticamente); en otros navegadores se descarga una copia.
+const TELAR_EXT = '.telar';
+const BACKUP_DAYS = 7;
+const fileState = {handle:null, name:'', auto:false, protected:false, password:null, savedAt:null, dirty:false, writing:false, lastAuto:0, timer:null, needsPermission:false, quiet:false};
+function canUseFilePicker(){ return typeof window.showSaveFilePicker==='function' && typeof window.showOpenFilePicker==='function'; }
+function projectSlug(){ return (normColName(project.name||'proyecto').replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')) || 'proyecto'; }
+function projectHasContent(){ return Object.keys(datasets).length + Object.keys(qualDocs).length + Object.keys(interviews).length + references.length > 0; }
+async function projectFileText(password){
+  const json = JSON.stringify(Object.assign(buildSessionBundle(), {kind:'proyecto-telar'}), jsonReplacer);
+  return password ? JSON.stringify(await encryptText(json, password)) : json;
+}
+async function loadFileMeta(){
+  Object.assign(fileState, {handle:null, name:'', auto:false, protected:false, password:null, savedAt:null, dirty:false, needsPermission:false});
+  clearTimeout(fileState.timer);
+  if(currentProjectId){
+    try{ const m = await idbGet('filemeta:'+currentProjectId); if(m) Object.assign(fileState, {name:m.name||'', auto:!!m.auto, protected:!!m.protected, savedAt:m.savedAt||null}); }catch(e){}
+    try{ const h = await idbGet('filehandle:'+currentProjectId); if(h && typeof h.createWritable==='function') fileState.handle = h; }catch(e){}
+  }
+  quietFileState();
+}
+// tras abrir o cambiar de proyecto, los guardados internos de la app no cuentan como "cambios sin guardar"
+function quietFileState(){ fileState.quiet = true; setTimeout(()=>{ fileState.quiet = false; fileState.dirty = false; updateFileStatus(); }, 700); updateFileStatus(); }
+async function saveFileMeta(){
+  if(!currentProjectId) return;
+  try{ await idbSet('filemeta:'+currentProjectId, {name:fileState.name, auto:fileState.auto, protected:fileState.protected, savedAt:fileState.savedAt}); }catch(e){}
+}
+function markFileDirty(){ if(fileState.quiet) return; fileState.dirty = true; updateFileStatus(); fileAutoSave(); }
+async function writeToHandle(handle, text, ask){
+  if(handle.queryPermission && (await handle.queryPermission({mode:'readwrite'}))!=='granted'){
+    if(!ask || !handle.requestPermission || (await handle.requestPermission({mode:'readwrite'}))!=='granted') throw new Error('el navegador no dio permiso para escribir el archivo');
+  }
+  const w = await handle.createWritable(); await w.write(text); await w.close();
+}
+// guardar: opts.as = elegir otro archivo; opts.password; opts.auto
+async function saveProjectToFile(opts={}){
+  const password = opts.password!==undefined ? opts.password : fileState.password;
+  const text = await projectFileText(password);
+  if(canUseFilePicker()){
+    let handle = (!opts.as && fileState.handle) || null;
+    if(!handle){
+      try{ handle = await window.showSaveFilePicker({suggestedName: projectSlug()+TELAR_EXT, types:[{description:'Proyecto de Telar', accept:{'application/json':[TELAR_EXT]}}]}); }
+      catch(e){ if(e && e.name==='AbortError') return false; throw e; }
+    }
+    await writeToHandle(handle, text, true);
+    fileState.handle = handle; fileState.name = handle.name || (projectSlug()+TELAR_EXT);
+    try{ await idbSet('filehandle:'+currentProjectId, handle); }catch(e){}
+  } else {
+    fileState.name = projectSlug() + (password ? '_protegido' : '') + TELAR_EXT;
+    universalDownload(fileState.name, text);
+  }
+  if(opts.auto!==undefined) fileState.auto = !!opts.auto && canUseFilePicker();
+  Object.assign(fileState, {savedAt: new Date().toISOString(), dirty:false, protected: !!password, password: password || null, needsPermission:false});
+  await saveFileMeta(); updateFileStatus();
+  return true;
+}
+function fileAutoSave(){
+  if(!fileState.auto || !fileState.handle || fileState.writing || isPrivate()) return;
+  if(fileState.protected && !fileState.password) return; // un archivo protegido necesita la contraseña: se pide al guardar a mano
+  clearTimeout(fileState.timer);
+  fileState.timer = setTimeout(async ()=>{
+    fileState.writing = true;
+    try{
+      if(fileState.handle.queryPermission && (await fileState.handle.queryPermission({mode:'readwrite'}))!=='granted'){ fileState.needsPermission = true; return; }
+      await writeToHandle(fileState.handle, await projectFileText(fileState.password), false);
+      Object.assign(fileState, {savedAt: new Date().toISOString(), dirty:false, lastAuto: Date.now(), needsPermission:false});
+      saveFileMeta();
+    }catch(e){ console.warn('No se pudo guardar automáticamente en el archivo:', e); fileState.needsPermission = true; }
+    finally{ fileState.writing = false; updateFileStatus(); }
+  }, Math.max(1500, 4000 - (Date.now() - fileState.lastAuto)));
+}
+function timeAgoEs(iso){
+  const s = (Date.now() - new Date(iso).getTime())/1000;
+  if(s < 60) return 'recién'; if(s < 3600) return 'hace '+Math.round(s/60)+' min';
+  const d = new Date(iso), today = new Date();
+  if(d.toDateString()===today.toDateString()) return 'hoy a las '+d.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
+  const days = Math.floor(s/86400); return days<=1 ? 'ayer' : 'hace '+days+' días';
+}
+function updateFileStatus(){
+  const el = document.getElementById('file-status'); if(!el) return;
+  const has = projectHasContent();
+  const days = fileState.savedAt ? (Date.now() - new Date(fileState.savedAt).getTime())/86400000 : Infinity;
+  let html = '';
+  if(fileState.name){
+    const state = fileState.needsPermission ? '<span style="color:var(--rust)">tocá 💾 Guardar para volver a conectar el archivo</span>'
+      : fileState.dirty ? (fileState.auto && fileState.handle && !(fileState.protected && !fileState.password) ? 'guardando…' : '<span style="color:var(--rust)">cambios sin guardar</span>')
+      : 'guardado ' + timeAgoEs(fileState.savedAt);
+    html = `💾 <strong>${esc(fileState.name)}</strong> · ${state}${fileState.auto && fileState.handle ? ' · guardado automático' : ''} · <button type="button" class="gl-link" id="file-saveas">Guardar como…</button>`;
+  } else if(has){
+    html = `<span style="color:var(--rust)">⚠ Este proyecto todavía no tiene una copia en un archivo.</span> <button type="button" class="gl-link" id="file-savenow">Guardar ahora</button>`;
+  }
+  if(has && fileState.name && fileState.dirty && days >= BACKUP_DAYS && !(fileState.auto && fileState.handle))
+    html += ` <span style="color:var(--rust)">· hace ${Math.floor(days)} días que no guardás una copia</span>`;
+  el.innerHTML = html;
+  const a = document.getElementById('file-saveas'); if(a) a.onclick = ()=>openSaveDialog({as:true});
+  const b = document.getElementById('file-savenow'); if(b) b.onclick = ()=>openSaveDialog({});
+}
+// 💾 Guardar / Ctrl+S: si ya hay un archivo, guarda ahí; si no, pregunta dónde y cómo
+async function quickSave(){
+  if(fileState.handle && canUseFilePicker()){
+    let pass = fileState.password;
+    if(fileState.protected && !pass){ pass = await askPassword('Contraseña del archivo "'+fileState.name+'"'); if(pass===null) return; }
+    try{ await saveProjectToFile({password: pass}); flashFileStatus('Guardado en '+fileState.name); }
+    catch(e){ alert('No se pudo guardar el archivo: '+e.message); }
+    return;
+  }
+  openSaveDialog({});
+}
+function flashFileStatus(msg){ const el = document.getElementById('file-status'); if(!el) return; el.innerHTML = '✓ '+esc(msg); setTimeout(updateFileStatus, 2500); }
+function openSaveDialog(opts){
+  const can = cryptoAvailable(), picker = canUseFilePicker();
+  showModal(opts.as ? 'Guardar el proyecto como…' : 'Guardar el proyecto', `
+    <p class="hint">Guarda todo el proyecto (datos, configuración, códigos, notas, informe y referencias) en un archivo <strong>.telar</strong>. Sirve como respaldo, para pasarlo a otra computadora o para compartirlo. Se abre con <strong>📂 Abrir</strong>.</p>
+    ${picker ? `<label class="chk-opt" style="white-space:normal;margin-bottom:8px"><input type="checkbox" id="exp-auto" ${fileState.auto || !fileState.name ? 'checked' : ''}> Guardar automáticamente en este archivo mientras trabajo</label>`
+      : `<p class="hint">Este navegador descarga una copia nueva cada vez que guardás. En Chrome o Edge se puede guardar siempre sobre el mismo archivo, y automáticamente.</p>`}
+    <label class="chk-opt" style="white-space:normal;margin-bottom:8px"><input type="checkbox" id="exp-protect" ${can?'':'disabled'} ${fileState.protected?'checked':''}> Proteger con contraseña (recomendado si contiene entrevistas o datos personales)</label>
+    <div id="exp-pass-wrap" style="display:${fileState.protected?'block':'none'};margin-bottom:10px">
+      <div class="field" style="max-width:100%;margin-bottom:6px"><label>Contraseña (mínimo 8 caracteres)</label><input type="password" id="exp-pass" autocomplete="new-password"></div>
+      <div class="field" style="max-width:100%"><label>Repetir contraseña</label><input type="password" id="exp-pass2" autocomplete="new-password"></div>
+      <p class="hint" style="margin:6px 0 0;color:var(--rust)">Si perdés la contraseña, el archivo no se puede recuperar: la app no la guarda en ningún lado.</p>
+    </div>
+    ${can ? '' : '<p class="hint">Este navegador no permite cifrar archivos desde esta página.</p>'}
+    <div id="exp-msg" class="hint" style="margin:0 0 8px"></div>
+    <button class="go" id="exp-go">${picker ? 'Elegir dónde guardar' : 'Descargar'}</button>`);
+  const prot = document.getElementById('exp-protect');
+  prot.onchange = ()=>{ document.getElementById('exp-pass-wrap').style.display = prot.checked ? 'block' : 'none'; };
+  document.getElementById('exp-go').onclick = async ()=>{
+    const msg = document.getElementById('exp-msg');
+    let password = null;
+    if(prot.checked){
+      const p1 = document.getElementById('exp-pass').value, p2 = document.getElementById('exp-pass2').value;
+      if(p1.length<8){ msg.textContent = 'La contraseña debe tener al menos 8 caracteres.'; return; }
+      if(p1!==p2){ msg.textContent = 'Las contraseñas no coinciden.'; return; }
+      password = p1; msg.textContent = 'Cifrando…';
+    }
+    const auto = document.getElementById('exp-auto');
+    try{
+      const ok = await saveProjectToFile({as: true, password, auto: auto ? auto.checked : false});
+      if(ok) closeModal(false);
+      else msg.textContent = '';
+    }catch(err){ msg.textContent = 'No se pudo guardar: '+err.message; }
+  };
+}
+// 📂 Abrir: un archivo .telar (o una sesión .json exportada con versiones anteriores)
+async function pickProjectFile(){
+  if(canUseFilePicker()){
+    let handle;
+    try{ [handle] = await window.showOpenFilePicker({types:[{description:'Proyecto de Telar', accept:{'application/json':[TELAR_EXT, '.json']}}]}); }
+    catch(e){ if(e && e.name==='AbortError') return; throw e; }
+    openProjectFile(await handle.getFile(), handle);
+  } else document.getElementById('import-session-input').click();
+}
+function askOpenMode(name){
+  return new Promise(resolve=>{
+    let done = false; const fin = v=>{ if(done) return; done = true; closeModal(false); resolve(v); };
+    showModal('Abrir "'+name+'"', `<p class="hint">¿Cómo querés abrir este archivo?</p>
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">
+        <button class="go" id="om-new">Como proyecto nuevo (recomendado)</button>
+        <button class="mini-export" id="om-replace">Reemplazar el proyecto actual</button>
+        <button class="mini-export" id="om-merge">Sumarlo al proyecto actual</button>
+      </div>`, {onClose: ()=>{ if(!done){ done = true; resolve(null); } }});
+    document.getElementById('om-new').onclick = ()=>fin('new');
+    document.getElementById('om-replace').onclick = ()=>fin('replace');
+    document.getElementById('om-merge').onclick = ()=>fin('merge');
+  });
+}
+async function openProjectFile(file, handle){
+  try{
+    let text = await readFileAs(file, 'text'), password = null;
+    const head = JSON.parse(text);
+    if(head && head.kind==='sesion-cifrada'){
+      if(!cryptoAvailable()) throw new Error('este navegador no permite abrir archivos cifrados');
+      let opened = null;
+      for(let attempt=0; attempt<3 && opened===null; attempt++){
+        const pass = await askPassword(attempt ? 'Contraseña incorrecta: probá de nuevo' : 'Abrir "'+file.name+'"');
+        if(pass===null) return;
+        try{ opened = await decryptBundle(head, pass); password = pass; }catch(e){ if(attempt===2) throw e; }
+      }
+      text = opened;
+    }
+    const bundle = JSON.parse(text, jsonReviver);
+    if(!bundle || typeof bundle!=='object' || !('datasets' in bundle)) throw new Error('el archivo no parece un proyecto de Telar');
+    if(bundle.schema && bundle.schema > SESSION_SCHEMA && !confirm('Este archivo fue creado con una versión más nueva de Telar. Puede que algunos datos no se lean bien. ¿Abrirlo igual?')) return;
+    const name = (bundle.project && bundle.project.name) || file.name.replace(/\.(telar|json)$/i, '');
+    let mode = 'replace';
+    if(projectHasContent()){ mode = await askOpenMode(file.name); if(!mode) return; }
+    if(mode==='new') await createProject(name, 'vacio');
+    applySession(bundle, mode==='merge' ? 'merge' : 'replace');
+    refreshAllAfterSession();
+    setUploadCollapsed(Object.keys(datasets).length + Object.keys(qualDocs).length > 0);
+    persistSession();
+    if(mode!=='merge'){
+      // el proyecto queda vinculado al archivo: los próximos guardados van ahí
+      Object.assign(fileState, {name: file.name, savedAt: new Date().toISOString(), protected: !!password, password, needsPermission:false,
+        handle: (handle && /\.telar$/i.test(file.name)) ? handle : null, auto: !!(handle && /\.telar$/i.test(file.name))});
+      if(fileState.handle) try{ await idbSet('filehandle:'+currentProjectId, fileState.handle); }catch(e){}
+      else try{ await idbDel('filehandle:'+currentProjectId); }catch(e){}
+      await saveFileMeta();
+    }
+    quietFileState();
+    flashFileStatus(mode==='merge' ? '"'+file.name+'" se sumó al proyecto' : 'Abierto "'+file.name+'"');
+  }catch(err){ alert('No se pudo abrir el archivo: '+err.message); }
+}
+/* ===== ARCHIVO DE PROYECTO (fin) ===== */
+
+/* ===== INFORME EN WORD (.docx) Y PDF (inicio) ===== */
+// El informe HTML se traduce a un documento de Word: títulos, párrafos, negritas e itálicas, listas, tablas e imágenes.
+// El archivo .docx se arma con el compresor que ya trae la app (SheetJS), sin librerías adicionales.
+function dxEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function imgSizeFromBytes(u8){
+  try{
+    if(u8[0]===0x89 && u8[1]===0x50){ const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength); return {w: dv.getUint32(16), h: dv.getUint32(20)}; }
+    if(u8[0]===0xFF && u8[1]===0xD8){ let p = 2; while(p < u8.length){ if(u8[p]!==0xFF){ p++; continue; } const m = u8[p+1], len = (u8[p+2]<<8) | u8[p+3]; if(m>=0xC0 && m<=0xC3) return {h:(u8[p+5]<<8)|u8[p+6], w:(u8[p+7]<<8)|u8[p+8]}; p += 2 + len; } }
+  }catch(e){}
+  return {w:800, h:500};
+}
+function htmlToDocxBytes(html, title){
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const media = []; let imgN = 0;
+  const BLOCK = /^(P|DIV|SECTION|ARTICLE|MAIN|HEADER|FOOTER|H[1-6]|UL|OL|LI|TABLE|THEAD|TBODY|TR|TD|TH|BLOCKQUOTE|DETAILS|SUMMARY|HR|FIGURE|FIGCAPTION|PRE)$/;
+  const hasBlock = el=>[...el.children].some(c=>BLOCK.test(c.tagName) || c.tagName==='IMG' && false);
+  const styleOf = el=>(el.getAttribute && el.getAttribute('style')) || '';
+  const imageRun = src=>{
+    const m = /^data:image\/(png|jpe?g);base64,(.+)$/i.exec(src||''); if(!m) return '';
+    const bin = atob(m[2]); const u8 = new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u8[i] = bin.charCodeAt(i);
+    const ext = /png/i.test(m[1]) ? 'png' : 'jpeg', n = ++imgN; media.push({name: 'imagen'+n+'.'+ext, bytes: u8});
+    const sz = imgSizeFromBytes(u8), maxW = 16*360000; // 16 cm de ancho útil
+    let cx = sz.w*9525, cy = sz.h*9525; if(cx > maxW){ cy = Math.round(cy*maxW/cx); cx = maxW; }
+    return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${n}" name="Imagen ${n}"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${n}" name="imagen${n}.${ext}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdImg${n}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+  };
+  // texto de un elemento como "runs" de Word, con negrita, itálica y saltos de línea
+  const runs = (node, f={})=>{
+    let x = '';
+    node.childNodes.forEach(ch=>{
+      if(ch.nodeType===3){
+        const t = ch.nodeValue.replace(/\s+/g, ' '); if(!t) return;
+        const pr = (f.b?'<w:b/>':'') + (f.i?'<w:i/>':'') + (f.sz?`<w:sz w:val="${f.sz}"/>`:'') + (f.color?`<w:color w:val="${f.color}"/>`:'');
+        x += `<w:r>${pr?'<w:rPr>'+pr+'</w:rPr>':''}<w:t xml:space="preserve">${dxEsc(t)}</w:t></w:r>`; return;
+      }
+      if(ch.nodeType!==1) return;
+      const tg = ch.tagName;
+      if(tg==='BR'){ x += '<w:r><w:br/></w:r>'; return; }
+      if(tg==='IMG'){ x += imageRun(ch.getAttribute('src')); return; }
+      if(tg==='STYLE' || tg==='SCRIPT') return;
+      const g = Object.assign({}, f);
+      if(tg==='STRONG' || tg==='B' || /font-weight:\s*(bold|[6-9]00)/.test(styleOf(ch))) g.b = true;
+      if(tg==='EM' || tg==='I' || /font-style:\s*italic/.test(styleOf(ch))) g.i = true;
+      x += runs(ch, g);
+    });
+    return x;
+  };
+  const para = (inner, style, ppr='')=>`<w:p><w:pPr>${style?`<w:pStyle w:val="${style}"/>`:''}${ppr}</w:pPr>${inner}</w:p>`;
+  const table = el=>{
+    const rows = [...el.querySelectorAll(':scope > tr, :scope > thead > tr, :scope > tbody > tr, :scope > tfoot > tr')];
+    if(!rows.length) return '';
+    const nCols = Math.max(...rows.map(r=>[...r.children].reduce((s,c)=>s + (+c.getAttribute('colspan')||1), 0)), 1);
+    const colW = Math.floor(9638/nCols);
+    let x = `<w:tbl><w:tblPr><w:tblStyle w:val="TablaTelar"/><w:tblW w:w="5000" w:type="pct"/></w:tblPr><w:tblGrid>${('<w:gridCol w:w="'+colW+'"/>').repeat(nCols)}</w:tblGrid>`;
+    rows.forEach(r=>{
+      x += '<w:tr>';
+      [...r.children].forEach(c=>{
+        const th = c.tagName==='TH', span = +c.getAttribute('colspan')||1;
+        const f = {b: th, sz: 18};
+        const inner = hasBlock(c) ? blocks(c, f) : para(runs(c, f), 'Tabla');
+        x += `<w:tc><w:tcPr>${span>1?`<w:gridSpan w:val="${span}"/>`:''}${th?'<w:shd w:val="clear" w:color="auto" w:fill="E8ECEB"/>':''}</w:tcPr>${inner || para('', 'Tabla')}</w:tc>`;
+      });
+      x += '</w:tr>';
+    });
+    return x + '</w:tbl>' + para('', null);
+  };
+  const blocks = (node, f={})=>{
+    let x = '', inlineBuf = '';
+    const flush = ()=>{ if(inlineBuf.trim()) x += para(inlineBuf, f.sz ? 'Tabla' : null); inlineBuf = ''; };
+    node.childNodes.forEach(ch=>{
+      if(ch.nodeType===3){ if(ch.nodeValue.trim()) inlineBuf += runs({childNodes:[ch]}, f); return; }
+      if(ch.nodeType!==1) return;
+      const tg = ch.tagName;
+      if(tg==='STYLE' || tg==='SCRIPT' || tg==='TITLE' || tg==='HR') return;
+      if(!BLOCK.test(tg) && tg!=='IMG'){ inlineBuf += runs({childNodes:[ch]}, f); return; }
+      flush();
+      if(tg==='IMG'){ x += para(imageRun(ch.getAttribute('src')), null, '<w:jc w:val="center"/>'); return; }
+      if(tg==='H1'){ x += para(runs(ch), 'Title'); return; }
+      if(tg==='H2'){ x += para(runs(ch), 'Heading1'); return; }
+      if(tg==='H3'){ x += para(runs(ch), 'Heading2'); return; }
+      if(/^H[4-6]$/.test(tg)){ x += para(runs(ch), 'Heading3'); return; }
+      if(tg==='TABLE'){ x += table(ch); return; }
+      if(tg==='UL' || tg==='OL'){ let n = 0; [...ch.children].forEach(li=>{ n++; x += para(`<w:r><w:t xml:space="preserve">${tg==='OL' ? n+'. ' : '• '}</w:t></w:r>` + runs(li, f), 'Lista'); }); return; }
+      if(tg==='BLOCKQUOTE'){ x += hasBlock(ch) ? blocks(ch, Object.assign({}, f, {i:true})) : para(runs(ch, Object.assign({}, f, {i:true})), 'Cita'); return; }
+      if(tg==='SUMMARY'){ x += para(runs(ch, Object.assign({}, f, {b:true})), null); return; }
+      if(tg==='P' || tg==='FIGCAPTION' || tg==='PRE'){
+        const it = /font-style:\s*italic/.test(styleOf(ch));
+        x += hasBlock(ch) ? blocks(ch, f) : para(runs(ch, it ? Object.assign({}, f, {i:true}) : f), it ? 'Nota' : (f.sz ? 'Tabla' : null)); return;
+      }
+      x += hasBlock(ch) ? blocks(ch, f) : (ch.textContent.trim() || ch.querySelector('img') ? para(runs(ch, f), f.sz ? 'Tabla' : null) : '');
+    });
+    flush();
+    return x;
+  };
+  const bodyXml = blocks(doc.body);
+  const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
+  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${W}><w:body>${bodyXml}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="567" w:footer="567" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  const st = (id, name, ppr, rpr, extra='')=>`<w:style w:type="paragraph" w:styleId="${id}"><w:name w:val="${name}"/><w:basedOn w:val="Normal"/>${extra}<w:pPr>${ppr}</w:pPr><w:rPr>${rpr}</w:rPr></w:style>`;
+  const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Georgia" w:hAnsi="Georgia" w:cs="Georgia" w:eastAsia="Georgia"/><w:sz w:val="22"/><w:lang w:val="es-AR"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="120" w:line="276" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>`
+    + `<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>`
+    + st('Title', 'Title', '<w:spacing w:after="240"/>', '<w:b/><w:sz w:val="40"/>')
+    + st('Heading1', 'heading 1', '<w:keepNext/><w:spacing w:before="360" w:after="120"/><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="2" w:color="BBBBBB"/></w:pBdr><w:outlineLvl w:val="0"/>', '<w:b/><w:sz w:val="28"/>')
+    + st('Heading2', 'heading 2', '<w:keepNext/><w:spacing w:before="240" w:after="80"/><w:outlineLvl w:val="1"/>', '<w:b/><w:sz w:val="24"/>')
+    + st('Heading3', 'heading 3', '<w:keepNext/><w:spacing w:before="200" w:after="60"/><w:outlineLvl w:val="2"/>', '<w:b/><w:sz w:val="22"/>')
+    + st('Nota', 'Nota', '<w:spacing w:before="60" w:after="160"/>', '<w:i/><w:color w:val="555555"/><w:sz w:val="18"/>')
+    + st('Cita', 'Cita', '<w:ind w:left="567" w:right="567"/>', '<w:i/>')
+    + st('Lista', 'Lista', '<w:ind w:left="425" w:hanging="283"/><w:spacing w:after="60"/>', '')
+    + st('Tabla', 'Texto de tabla', '<w:spacing w:after="0" w:line="240" w:lineRule="auto"/>', '<w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:sz w:val="18"/>')
+    + `<w:style w:type="table" w:styleId="TablaTelar"><w:name w:val="Tabla Telar"/><w:tblPr><w:tblBorders><w:top w:val="single" w:sz="4" w:color="BBBBBB"/><w:left w:val="single" w:sz="4" w:color="BBBBBB"/><w:bottom w:val="single" w:sz="4" w:color="BBBBBB"/><w:right w:val="single" w:sz="4" w:color="BBBBBB"/><w:insideH w:val="single" w:sz="4" w:color="BBBBBB"/><w:insideV w:val="single" w:sz="4" w:color="BBBBBB"/></w:tblBorders><w:tblCellMar><w:top w:w="40" w:type="dxa"/><w:left w:w="90" w:type="dxa"/><w:bottom w:w="40" w:type="dxa"/><w:right w:w="90" w:type="dxa"/></w:tblCellMar></w:tblPr></w:style></w:styles>`;
+  const rels = media.map((m,i)=>`<Relationship Id="rIdImg${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${m.name}"/>`).join('');
+  const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+  const files = [
+    ['[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Default Extension="jpeg" ContentType="image/jpeg"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>`],
+    ['_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>`],
+    ['docProps/core.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${dxEsc(title||'Informe')}</dc:title><dc:creator>${dxEsc(APP_LABEL)}</dc:creator><dc:language>es-AR</dc:language><dcterms:created xsi:type="dcterms:W3CDTF">${now}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${now}</dcterms:modified></cp:coreProperties>`],
+    ['word/document.xml', documentXml],
+    ['word/styles.xml', stylesXml],
+    ['word/_rels/document.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>${rels}</Relationships>`]
+  ];
+  const z = XLSX.CFB.utils.cfb_new();
+  const enc = new TextEncoder();
+  files.forEach(([p, t])=>XLSX.CFB.utils.cfb_add(z, '/'+p, enc.encode(t)));
+  media.forEach(m=>XLSX.CFB.utils.cfb_add(z, '/word/media/'+m.name, m.bytes));
+  return new Uint8Array(XLSX.CFB.write(z, {fileType:'zip', type:'array', compression:true}));
+}
+function reportFileBase(){ return 'informe_'+new Date().toISOString().slice(0,10); }
+function downloadReportDocx(){
+  try{
+    const bytes = htmlToDocxBytes(buildReportHtml('docx'), 'Informe de análisis');
+    universalDownload(reportFileBase()+'.docx', new Blob([bytes], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
+  }catch(err){ alert('No se pudo armar el documento de Word: '+err.message); }
+}
+// PDF: el informe se abre en la ventana de impresión del navegador, donde se elige "Guardar como PDF"
+function printReport(){
+  const fr = document.createElement('iframe');
+  fr.setAttribute('title', 'Informe para imprimir');
+  fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(fr);
+  fr.onload = ()=>{ setTimeout(()=>{
+    try{ fr.contentWindow.focus(); fr.contentWindow.print(); }
+    catch(e){ alert('No se pudo abrir la impresión: descargá el informe en HTML y guardalo como PDF desde el navegador.'); }
+    setTimeout(()=>fr.remove(), 120000);
+  }, 250); };
+  fr.srcdoc = buildReportHtml('pdf');
+}
+/* ===== INFORME EN WORD Y PDF (fin) ===== */
+
 /* ===== OCR: texto desde imágenes, fotos y PDF escaneados (inicio) ===== */
 // Motor: Tesseract (incluido en vendor/tesseract, se descarga solo la primera vez que se usa).
 // Todo se procesa en la computadora: las imágenes no se envían a ningún servidor.
@@ -4750,7 +5350,7 @@ function addToReport(item){
   updateReportFab(); persistSession();
 }
 
-function downloadReport(){
+function buildReportHtml(fmt='html'){ // fmt: 'html' | 'docx' | 'pdf'
   // el anexo metodológico, si está, va al final
   const ax = reportItems.filter(it=>it.ref==='annex'); if(ax.length){ reportItems = reportItems.filter(it=>it.ref!=='annex').concat(ax); }
   const generatedAt = new Date().toLocaleString('es-AR');
@@ -4781,13 +5381,14 @@ th{background:#eee}
 @media print{ section{page-break-inside:avoid} }
 </style></head><body>
 <h1>Informe de análisis</h1>
-<p class="meta">Generado con "Telar" el ${generatedAt}. Incluye ${ordered.filter(i=>i.type!=='refs').length} elemento(s)${ordered.some(i=>i.type==='refs')?' y la lista de referencias':''}. Podés abrir este archivo en el navegador e imprimirlo o guardarlo como PDF (Ctrl/Cmd+P).</p>
+<p class="meta">Generado con "Telar" el ${generatedAt}. Incluye ${ordered.filter(i=>i.type!=='refs').length} elemento(s)${ordered.some(i=>i.type==='refs')?' y la lista de referencias':''}.${fmt==='html' ? ' Podés abrir este archivo en el navegador e imprimirlo o guardarlo como PDF (Ctrl/Cmd+P).' : ''}</p>
 ${sourceHtml}
 ${itemsHtml || '<p>Sin elementos.</p>'}
 ${sourceHtml ? '<hr style="margin-top:30px;border:none;border-top:1px solid #ccc">'+sourceHtml : ''}
 </body></html>`;
-  universalDownload('informe_'+new Date().toISOString().slice(0,10)+'.html', new Blob([html], {type:'text/html'}));
+  return html;
 }
+function downloadReport(){ universalDownload(reportFileBase()+'.html', new Blob([buildReportHtml()], {type:'text/html'})); }
 
 document.querySelectorAll('.mini-export[data-report]').forEach(btn=>{
   btn.addEventListener('click', async ()=>{
@@ -4835,7 +5436,7 @@ document.getElementById('report-fab-btn').addEventListener('click', ()=>{
       <button class="del-btn" data-rm="${i}">✕</button>
     </div>`).join('') : '<p class="empty">Todavía no agregaste nada — usá el botón "📌 Agregar al informe" en cualquier gráfico o tabla cruzada.</p>')
     + (reportItems.length ? `<div id="src-editor-wrap" style="margin-top:12px"></div><p class="hint" style="margin:6px 0 0">La fuente aparece arriba y al pie del informe. Si no marcás nada, no se muestra.</p>` : '')
-    + (reportItems.length ? `<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="go" id="report-download-btn">Descargar informe completo (HTML)</button><button id="report-clear-btn" style="border:1px solid var(--line);background:var(--panel);color:var(--rust);font-size:.85rem;padding:8px 14px;border-radius:3px;cursor:pointer">🧹 Vaciar todo</button></div>` : '');
+    + (reportItems.length ? `<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><span class="hint" style="margin:0;align-self:center">Descargar el informe:</span><button class="go" id="report-docx-btn" title="Documento de Word, editable">⭳ Word (.docx)</button><button class="mini-export" id="report-pdf-btn" title="Se abre la ventana de impresión: elegí Guardar como PDF">PDF</button><button class="mini-export" id="report-download-btn" title="Página web que se abre en el navegador">HTML</button><button id="report-clear-btn" style="border:1px solid var(--line);background:var(--panel);color:var(--rust);font-size:.85rem;padding:8px 14px;border-radius:3px;cursor:pointer">🧹 Vaciar todo</button></div>` : '');
   showModal('Informe ('+reportItems.length+' elemento'+(reportItems.length===1?'':'s')+')', body);
   if(document.getElementById('src-editor-wrap')) mountSourceEditor('src-editor-wrap');
   document.querySelectorAll('#modal-body [data-rm]').forEach(b=> b.onclick = ()=>{
@@ -4851,7 +5452,7 @@ document.getElementById('report-fab-btn').addEventListener('click', ()=>{
       document.getElementById('modal-overlay').style.display = 'none';
     }
   };
-  if(reportItems.length) document.getElementById('report-download-btn').onclick = downloadReport;
+  if(reportItems.length){ document.getElementById('report-download-btn').onclick = downloadReport; document.getElementById('report-docx-btn').onclick = downloadReportDocx; document.getElementById('report-pdf-btn').onclick = printReport; }
 });
 
 function renderPeriodPills(){
@@ -5087,7 +5688,7 @@ function loadWordFile(file, statusEl, opts={}){
   reader.onload = e => {
     const heavy = file.size > 500000;
     if(heavy) showBusy('Leyendo "'+file.name+'"…');
-    mammoth.convertToHtml({arrayBuffer:e.target.result}).finally(()=>{ if(heavy) hideBusy(); }).then(result=>{
+    (opts.html!=null ? Promise.resolve({value: opts.html}) : mammoth.convertToHtml({arrayBuffer:e.target.result})).finally(()=>{ if(heavy) hideBusy(); }).then(result=>{
       const div = document.createElement('div');
       div.innerHTML = result.value;
       const tables = div.querySelectorAll('table');
@@ -5375,9 +5976,13 @@ function findQualDocForYear(year){
 function loadFile(file){
   // imágenes, capturas y PDF escaneados: texto por OCR
   if(/\.(jpe?g|png|webp|gif|bmp|pdf)$/i.test(file.name) || /^image\//.test(file.type||'')){ openOcrFiles([file]); return; }
+  if(/\.telar$/i.test(file.name)){ openProjectFile(file, null); return; } // un proyecto guardado
   const statusEl = addStatusLine(`Procesando "${file.name}"...`);
   if(/\.docx$/i.test(file.name)){ loadWordFile(file, statusEl); return; }
   if(/\.sav$/i.test(file.name)){ loadSavFile(file, statusEl); return; }
+  if(/\.dta$/i.test(file.name)){ loadSavFile(file, statusEl, {read: readDta, kind: 'Stata'}); return; }
+  if(/\.odt$/i.test(file.name)){ loadOdtFile(file, statusEl); return; }
+  if(/\.txt$/i.test(file.name)){ loadTxtFile(file, statusEl); return; }
   const reader = new FileReader();
   reader.onload = e => {
     setTimeout(async ()=>{
@@ -7451,7 +8056,7 @@ async function openProblemReport(){
 function openAbout(){
   showModal('Telar '+APP_VERSION+' — versión beta', `
     <p><strong>Telar · Asistente de investigación</strong> integra en una sola herramienta el análisis de bases de datos y encuestas, relatos fechados, entrevistas y codificación cualitativa, con trazabilidad metodológica.</p>
-    <p><strong>Qué significa "beta".</strong> La app ya se puede usar para trabajar: sus cálculos están verificados contra software estadístico de referencia (SciPy, statsmodels, samplics, scikit-learn). Pero todavía es una versión de prueba: puede tener errores, algunas funciones pueden cambiar y la forma de guardar los proyectos puede evolucionar. Por eso conviene exportar la sesión cada tanto como respaldo.</p>
+    <p><strong>Qué significa "beta".</strong> La app ya se puede usar para trabajar: sus cálculos están verificados contra software estadístico de referencia (SciPy, statsmodels, samplics, scikit-learn). Pero todavía es una versión de prueba: puede tener errores, algunas funciones pueden cambiar y la forma de guardar los proyectos puede evolucionar. Por eso conviene guardar el proyecto en un archivo cada tanto (💾 Guardar) como respaldo.</p>
     <p><strong>Privacidad.</strong> Todo se procesa en tu computadora: los archivos no se suben a ningún servidor. Lo que hacés queda guardado solo en este navegador (salvo en modo privado). La única consulta externa es la búsqueda opcional de datos bibliográficos en CrossRef.</p>
     <p><strong>Cómo citarla.</strong> ${esc(APP_LABEL)} — la versión figura también en cada informe, anexo y archivo exportado.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
@@ -7504,7 +8109,7 @@ window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); deferred
 window.addEventListener('appinstalled', ()=>{ deferredInstall = null; document.getElementById('install-btn').style.display = 'none'; });
 document.getElementById('install-btn').addEventListener('click', async ()=>{ if(!deferredInstall) return; deferredInstall.prompt(); try{ await deferredInstall.userChoice; }catch(e){} deferredInstall = null; document.getElementById('install-btn').style.display = 'none'; });
 // --- Abrir archivos desde el sistema (doble clic en un .xlsx, .csv, .docx o .sav, con la app instalada) ---
-if('launchQueue' in window){ window.launchQueue.setConsumer(async params=>{ if(!params.files || !params.files.length) return; for(const h of params.files){ try{ loadFile(await h.getFile()); }catch(e){ noteError(e.message); } } }); }
+if('launchQueue' in window){ window.launchQueue.setConsumer(async params=>{ if(!params.files || !params.files.length) return; for(const h of params.files){ try{ const f = await h.getFile(); if(/\.(telar|json)$/i.test(f.name)) openProjectFile(f, h); else loadFile(f); }catch(e){ noteError(e.message); } } }); }
 // --- Funcionamiento sin conexión y aviso de versión nueva (solo publicada por https o en localhost) ---
 function showUpdateToast(reg){
   if(document.getElementById('update-toast')) return;
@@ -7568,37 +8173,10 @@ async function decryptBundle(enc, password){
   }catch(e){ throw new Error('la contraseña no es correcta (o el archivo está dañado)'); }
 }
 function cryptoAvailable(){ return !!(window.crypto && crypto.subtle && window.TextEncoder); }
-document.getElementById('export-session-btn').addEventListener('click', ()=>{
-  const can = cryptoAvailable();
-  showModal('Exportar sesión', `
-    <p class="hint">Descarga un archivo .json con todo el proyecto: datos, configuración, notas, informe y referencias. Sirve como respaldo o para pasarlo a otra computadora.</p>
-    <label class="chk-opt" style="white-space:normal;margin-bottom:8px"><input type="checkbox" id="exp-protect" ${can?'':'disabled'}> Proteger con contraseña (recomendado si contiene entrevistas o datos personales)</label>
-    <div id="exp-pass-wrap" style="display:none;margin-bottom:10px">
-      <div class="field" style="max-width:100%;margin-bottom:6px"><label>Contraseña (mínimo 8 caracteres)</label><input type="password" id="exp-pass" autocomplete="new-password"></div>
-      <div class="field" style="max-width:100%"><label>Repetir contraseña</label><input type="password" id="exp-pass2" autocomplete="new-password"></div>
-      <p class="hint" style="margin:6px 0 0;color:var(--rust)">Si perdés la contraseña, el archivo no se puede recuperar: la app no la guarda en ningún lado.</p>
-    </div>
-    ${can ? '' : '<p class="hint">Este navegador no permite cifrar archivos desde esta página.</p>'}
-    <div id="exp-msg" class="hint" style="margin:0 0 8px"></div>
-    <button class="go" id="exp-go">Descargar</button>`);
-  const prot = document.getElementById('exp-protect');
-  prot.onchange = ()=>{ document.getElementById('exp-pass-wrap').style.display = prot.checked ? 'block' : 'none'; };
-  document.getElementById('exp-go').onclick = async ()=>{
-    const json = JSON.stringify(buildSessionBundle(), jsonReplacer, prot.checked ? 0 : 2);
-    const day = new Date().toISOString().slice(0,10);
-    const slug = normColName(project.name||'proyecto').replace(/[^a-z0-9]+/g,'_');
-    if(!prot.checked){ universalDownload('sesion_'+slug+'_'+day+'.json', json); closeModal(false); return; }
-    const p1 = document.getElementById('exp-pass').value, p2 = document.getElementById('exp-pass2').value, msg = document.getElementById('exp-msg');
-    if(p1.length<8){ msg.textContent = 'La contraseña debe tener al menos 8 caracteres.'; return; }
-    if(p1!==p2){ msg.textContent = 'Las contraseñas no coinciden.'; return; }
-    msg.textContent = 'Cifrando…';
-    try{
-      const enc = await encryptText(json, p1);
-      universalDownload('sesion_'+slug+'_'+day+'_protegida.json', JSON.stringify(enc));
-      closeModal(false);
-    }catch(err){ msg.textContent = 'No se pudo cifrar: '+err.message; }
-  };
-});
+document.getElementById('export-session-btn').addEventListener('click', ()=>quickSave());
+document.getElementById('open-project-btn').addEventListener('click', ()=>pickProjectFile().catch(e=>alert('No se pudo abrir: '+e.message)));
+// Ctrl+S (o Cmd+S): guardar el proyecto
+document.addEventListener('keydown', e=>{ if((e.ctrlKey || e.metaKey) && !e.altKey && (e.key==='s' || e.key==='S')){ e.preventDefault(); quickSave(); } });
 function askPassword(title){
   return new Promise(resolve=>{
     showModal(title, `<p class="hint">Este archivo está protegido con contraseña.</p>
@@ -7726,40 +8304,7 @@ function refreshAllAfterSession(){
   renderQualUI(); renderInterviewsUI(); renderCodebookPanel(); renderContextUI(); renderBibliography(); updateReportFab(); updateProjectLine(); updatePrivateUI();
 }
 
-document.getElementById('import-session-input').addEventListener('change', e=>{
-  const file = e.target.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = async ev=>{
-    try{
-      let text = ev.target.result;
-      const head = JSON.parse(text);
-      if(head && head.kind==='sesion-cifrada'){
-        if(!cryptoAvailable()) throw new Error('este navegador no permite abrir archivos cifrados');
-        let opened = null;
-        for(let attempt=0; attempt<3 && opened===null; attempt++){
-          const pass = await askPassword(attempt ? 'Contraseña incorrecta: probá de nuevo' : 'Abrir sesión protegida');
-          if(pass===null) return; // canceló
-          try{ opened = await decryptBundle(head, pass); }catch(e){ if(attempt===2) throw e; }
-        }
-        text = opened;
-      }
-      const bundle = JSON.parse(text, jsonReviver);
-      if(!bundle || typeof bundle!=='object' || !('datasets' in bundle)) throw new Error('el archivo no parece una sesión de esta app');
-      if(bundle.schema && bundle.schema > SESSION_SCHEMA){
-        if(!confirm('Esta sesión fue creada con una versión más nueva de la app. Puede que algunos datos no se lean bien. ¿Importar igual?')) return;
-      }
-      const hasCurrent = Object.keys(datasets).length || Object.keys(qualDocs).length || references.length;
-      const mode = (!hasCurrent || confirm('¿Reemplazar la sesión actual por la importada?\n\nAceptar = reemplazar todo.\nCancelar = sumar lo importado a lo que ya tenés.')) ? 'replace' : 'merge';
-      applySession(bundle, mode);
-      refreshAllAfterSession();
-      persistSession();
-      alert(mode==='replace' ? 'Sesión importada (reemplazó a la anterior).' : 'Sesión importada y sumada a la actual.');
-    }catch(err){ alert('No se pudo leer el archivo de sesión: '+err.message); }
-  };
-  reader.readAsText(file);
-  e.target.value = '';
-});
+document.getElementById('import-session-input').addEventListener('change', e=>{ const f = e.target.files[0]; e.target.value = ''; if(f) openProjectFile(f, null); });
 
 // Lee la sesión del formato anterior (varias claves en localStorage) para migrarla
 function readLegacySession(){
@@ -7808,7 +8353,7 @@ function readLegacySession(){
     setStorageWarning('⚠ No se pudo restaurar la sesión anterior. Si tenés un respaldo (.json), importalo.');
   }
   sessionReady = true;
-  refreshAllAfterSession();
+  refreshAllAfterSession(); loadFileMeta();
   collapseAtStartup();
   let savedPanel = 'graficos';
   try{ savedPanel = localStorage.getItem('acq_ui_panel') || 'graficos'; }catch(e){}
