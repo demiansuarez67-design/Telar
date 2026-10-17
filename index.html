@@ -223,7 +223,7 @@ tbody tr:hover{background:var(--accent-bg)}
   <div class="main-panel" id="panel-graficos" role="tabpanel" aria-labelledby="tab-graficos">
   <section class="card" id="explore" style="display:none">
     <div class="tabs" id="dataset-tabs"></div>
-    <div style="display:flex;justify-content:flex-end;margin:-10px 0 12px"><button type="button" class="mini-export" id="ds-columns-btn">⚙ Columnas de esta base</button></div>
+    <div style="display:flex;justify-content:flex-end;margin:-10px 0 12px"><button type="button" class="mini-export" id="ds-index-btn" title="Combinar varias preguntas en un índice y medir su consistencia (alfa de Cronbach)">＋ Crear índice</button> <button type="button" class="mini-export" id="ds-columns-btn">⚙ Columnas de esta base</button></div>
     <div class="modebar">
       <div class="modebar-modes">
       <button class="mode-btn active" data-mode="quick">Vista rápida</button>
@@ -313,11 +313,16 @@ tbody tr:hover{background:var(--accent-bg)}
     </div>
 
     <div id="cmp-view" style="display:none">
-      <p class="hint helptext">Compara un promedio (de una columna de tipo Número) o un porcentaje (de una categoría) entre los grupos de otra variable, con su margen de error. Con dos grupos informa la diferencia y la prueba t de Welch; con más, el ANOVA (clásico y de Welch); para porcentajes, el χ². Con ponderador, usa errores estándar de diseño y la corrección de Rao-Scott. Respeta los filtros activos.</p>
+      <p class="hint helptext">Compara un promedio (de una columna de tipo Número) o un porcentaje (de una categoría) entre los grupos de otra variable, con su margen de error. Con dos grupos informa la diferencia y la prueba t de Welch; con más, el ANOVA (clásico y de Welch); para porcentajes, el χ². Con ponderador, usa errores estándar de diseño y la corrección de Rao-Scott. Respeta los filtros activos. También se puede comparar por rangos (Mann-Whitney y Kruskal-Wallis, sin suponer una distribución normal), pedir comparaciones de a pares entre grupos, sumar un segundo factor (ANOVA de dos factores) o comparar dos mediciones de los mismos casos ("Antes y después"). La revisión de supuestos indica qué prueba conviene.</p>
       <div class="adv-controls">
-        <div class="field"><label>Comparar</label><select id="cmp-y"></select></div>
+        <div class="field"><label>Diseño</label><select id="cmp-design"><option value="ind">Grupos distintos</option><option value="pair">Antes y después (mismos casos)</option></select></div>
+        <div class="field"><label id="cmp-ylabel">Comparar</label><select id="cmp-y"></select></div>
         <div class="field" id="cmp-cat-wrap" style="display:none"><label>Categoría</label><select id="cmp-cat"></select></div>
-        <div class="field"><label>entre los grupos de</label><select id="cmp-g"></select></div>
+        <div class="field" id="cmp-y2-wrap" style="display:none"><label>Segunda medición</label><select id="cmp-y2"></select></div>
+        <div class="field" id="cmp-g-wrap"><label>entre los grupos de</label><select id="cmp-g"></select></div>
+        <div class="field" id="cmp-g2-wrap" style="display:none"><label>y también según (opcional)</label><select id="cmp-g2"></select></div>
+        <div class="field" id="cmp-method-wrap" style="display:none"><label>Prueba</label><select id="cmp-method"><option value="param">Promedios (t de Welch, ANOVA)</option><option value="rank">Rangos (Mann-Whitney, Kruskal-Wallis)</option></select></div>
+        <div class="field" id="cmp-post-wrap" style="display:none"><label>De a pares (3 o más grupos)</label><select id="cmp-post"><option value="">No</option><option value="gh" selected>Games-Howell</option><option value="tukey">Tukey</option><option value="holm">Holm</option><option value="bonferroni">Bonferroni</option></select></div>
         <button class="go" id="cmp-run" style="align-self:flex-end">Comparar</button>
       </div>
       <div id="cmp-out"></div>
@@ -563,7 +568,7 @@ tbody tr:hover{background:var(--accent-bg)}
 
 <script>
 // ===== Versión de Telar (al publicar una nueva, cambiar acá y en sw.js) =====
-const APP_VERSION = '0.10.0';
+const APP_VERSION = '0.11.0';
 const APP_CHANNEL = 'beta';
 const APP_LABEL = 'Telar ' + APP_VERSION + ' ' + APP_CHANNEL;
 // Dirección del formulario de comentarios (ej. un Formulario de Google). Vacía: se explica cómo configurarla.
@@ -812,6 +817,8 @@ document.getElementById('chk-percent').addEventListener('change', e=>{
 let showTrend = false;
 document.getElementById('cross-xlsx-btn').addEventListener('click', exportCrossXLSX);
 document.getElementById('cmp-run').addEventListener('click', runCompare);
+['cmp-design','cmp-y','cmp-method'].forEach(id=>document.getElementById(id).addEventListener('change', updateCmpControls));
+document.getElementById('ds-index-btn').addEventListener('click', openIndexDialog);
 document.getElementById('reg-run').addEventListener('click', runRegression);
 document.getElementById('cmp-y').addEventListener('change', ()=>fillCategorySelect('cmp-y','cmp-cat','cmp-cat-wrap'));
 document.getElementById('reg-y').addEventListener('change', ()=>fillCategorySelect('reg-y','reg-cat','reg-cat-wrap'));
@@ -2297,6 +2304,289 @@ function loadSavFile(file, statusEl, opts={}){ // también Stata (.dta), con opt
   });
 }
 
+/* ===== ESTADÍSTICA I: no paramétricas, comparaciones múltiples, supuestos, pareados, dos factores, Cronbach (inicio) ===== */
+// Normal: función de distribución (vía gamma incompleta) y cuantil (algoritmo AS 241, Wichura 1988)
+function normCdf(x){ if(!isFinite(x)) return x>0 ? 1 : 0; const q = 0.5*gammaQ(0.5, x*x/2); return x>=0 ? 1-q : q; }
+function normSf(x){ return normCdf(-x); }
+function normQuantile(p){
+  if(p<=0) return -Infinity; if(p>=1) return Infinity;
+  const q = p - 0.5;
+  if(Math.abs(q) <= 0.425){
+    const r = 0.180625 - q*q;
+    return q*(((((((r*2509.0809287301226727+33430.575583588128105)*r+67265.770927008700853)*r+45921.953931549871457)*r+13731.693765509461125)*r+1971.5909503065514427)*r+133.14166789178437745)*r+3.387132872796366608)
+      /(((((((r*5226.495278852545925+28729.085735721942674)*r+39307.89580009271061)*r+21213.794301586595867)*r+5394.1960214247511077)*r+687.1870074920579083)*r+42.313330701600911252)*r+1);
+  }
+  let r = q<0 ? p : 1-p; r = Math.sqrt(-Math.log(r)); let v;
+  if(r <= 5){ r -= 1.6;
+    v = (((((((r*7.7454501427834140764e-4+0.0227238449892691845833)*r+0.24178072517745061177)*r+1.27045825245236838258)*r+3.64784832476320460504)*r+5.7694972214606914055)*r+4.6303378461565452959)*r+1.42343711074968357734)
+      /(((((((r*1.05075007164441684324e-9+5.475938084995344946e-4)*r+0.0151986665636164571966)*r+0.14810397642748007459)*r+0.68976733498510000455)*r+1.6763848301838038494)*r+2.05319162663775882187)*r+1);
+  } else { r -= 5;
+    v = (((((((r*2.01033439929228813265e-7+2.71155556874348757815e-5)*r+0.0012426609473880784386)*r+0.026532189526576123093)*r+0.29656057182850489123)*r+1.7848265399172913358)*r+5.4637849111641143699)*r+6.6579046435011037772)
+      /(((((((r*2.04426310338993978564e-15+1.4215117583164458887e-7)*r+1.8463183175100546818e-5)*r+7.868691311456132591e-4)*r+0.0148753612908506148525)*r+0.13692988092273580531)*r+0.59983220655588793769)*r+1);
+  }
+  return q<0 ? -v : v;
+}
+function chi2Sf(x, df){ return x<=0 ? 1 : gammaQ(df/2, x/2); }
+// --- rangos con empates (promedio) ---
+function rankAvg(vals){
+  const idx = vals.map((v,i)=>i).sort((a,b)=>vals[a]-vals[b]);
+  const r = new Array(vals.length), ties = [];
+  for(let i=0;i<idx.length;){ let j = i; while(j+1<idx.length && vals[idx[j+1]]===vals[idx[i]]) j++;
+    const avg = (i+j)/2 + 1; for(let k=i;k<=j;k++) r[idx[k]] = avg; if(j>i) ties.push(j-i+1); i = j+1; }
+  return {ranks: r, tieSum: ties.reduce((s,t)=>s + t*t*t - t, 0)};
+}
+// --- Mann-Whitney U (dos grupos independientes) ---
+function mannWhitney(x, y){
+  const n1 = x.length, n2 = y.length, N = n1+n2;
+  const {ranks, tieSum} = rankAvg(x.concat(y));
+  const R1 = ranks.slice(0, n1).reduce((s,v)=>s+v, 0);
+  const U1 = R1 - n1*(n1+1)/2, U2 = n1*n2 - U1, U = Math.max(U1, U2);
+  let p, method;
+  if(Math.min(n1, n2) <= 8 && tieSum===0){ // distribución exacta
+    method = 'exacta';
+    const cnt = mwExactCounts(n1, n2), tot = cnt.reduce((s,v)=>s+v, 0);
+    let sf = 0; for(let u=Math.ceil(U); u<cnt.length; u++) sf += cnt[u];
+    p = Math.min(1, 2*sf/tot);
+  } else {
+    method = 'aproximación normal';
+    const mu = n1*n2/2, sd = Math.sqrt(n1*n2/12 * ((N+1) - tieSum/(N*(N-1))));
+    const z = sd>0 ? (U - mu - 0.5)/sd : 0; p = Math.min(1, 2*normSf(z));
+  }
+  const zEff = (U1 - n1*n2/2)/Math.sqrt(n1*n2*(N+1)/12);
+  return {U: U1, U2, p, method, r: Math.abs(zEff)/Math.sqrt(N), rankBiserial: 1 - 2*Math.min(U1,U2)/(n1*n2)};
+}
+function mwExactCounts(n1, n2){ // cantidad de ordenamientos con cada valor de U (recursión clásica)
+  const memo = new Map();
+  const f = (m, n)=>{ const k = m+','+n; if(memo.has(k)) return memo.get(k);
+    let res; if(m===0 || n===0){ res = [1]; } else { const a = f(m-1, n), b = f(m, n-1); res = new Array(m*n+1).fill(0);
+      b.forEach((v,u)=>{ res[u] += v; }); a.forEach((v,u)=>{ res[u+n] += v; }); }
+    memo.set(k, res); return res; };
+  return f(n1, n2);
+}
+// --- Kruskal-Wallis (tres o más grupos) y comparaciones de Dunn ---
+function kruskalWallis(groups){ // groups: [{g, vals}]
+  const all = groups.flatMap(g=>g.vals), N = all.length, k = groups.length;
+  const {ranks, tieSum} = rankAvg(all);
+  let off = 0, H = 0; const meanRanks = [];
+  groups.forEach(g=>{ const R = ranks.slice(off, off+g.vals.length).reduce((s,v)=>s+v, 0); meanRanks.push(R/g.vals.length); H += R*R/g.vals.length; off += g.vals.length; });
+  H = 12/(N*(N+1))*H - 3*(N+1);
+  const C = 1 - tieSum/(N*N*N - N); if(C>0) H /= C;
+  return {H, df: k-1, p: chi2Sf(H, k-1), eps2: H/((N*N-1)/(N+1)), meanRanks, N, tieSum};
+}
+function pAdjust(ps, method){ // 'holm' | 'bonferroni' | 'none'
+  const m = ps.length; if(method==='none') return ps.slice();
+  if(method==='bonferroni') return ps.map(p=>Math.min(1, p*m));
+  const ord = ps.map((p,i)=>i).sort((a,b)=>ps[a]-ps[b]), out = new Array(m); let run = 0;
+  ord.forEach((i,r)=>{ run = Math.max(run, Math.min(1, (m-r)*ps[i])); out[i] = run; });
+  return out;
+}
+function dunnTest(groups, method='holm'){
+  const kw = kruskalWallis(groups), N = kw.N, pairs = [];
+  const s2 = N*(N+1)/12 - kw.tieSum/(12*(N-1));
+  for(let i=0;i<groups.length;i++) for(let j=i+1;j<groups.length;j++){
+    const z = (kw.meanRanks[i]-kw.meanRanks[j]) / Math.sqrt(s2*(1/groups[i].vals.length + 1/groups[j].vals.length));
+    pairs.push({a: groups[i].g, b: groups[j].g, z, p: 2*normSf(Math.abs(z))});
+  }
+  const adj = pAdjust(pairs.map(x=>x.p), method); pairs.forEach((x,i)=>{ x.padj = adj[i]; });
+  return pairs;
+}
+// --- Distribución del rango estudentizado (traducción de ptukey de R) ---
+function tukeyWprob(w, rr, cc){
+  const nleg = 12, ihalf = 6, C1 = -30, C2 = -50, C3 = 60, bb = 8, wlar = 3, wincr1 = 2, wincr2 = 3;
+  const xleg = [0.981560634246719250690549090149, 0.904117256370474856678465866119, 0.769902674194304687036893833213, 0.587317954286617447296702418941, 0.367831498998180193752691536644, 0.125233408511468915472441369464];
+  const aleg = [0.047175336386511827194615961485, 0.106939325995318430960254718194, 0.160078328543346226334652529543, 0.203167426723065921749064455810, 0.233492536538354808760849898925, 0.249147045813402785000562436043];
+  const qsqz = w*0.5; if(qsqz >= bb) return 1;
+  let prw = 2*normCdf(qsqz) - 1;
+  prw = prw >= Math.exp(C2/cc) ? Math.pow(prw, cc) : 0;
+  const wincr = w > wlar ? wincr1 : wincr2;
+  let blb = qsqz; const binc = (bb - qsqz)/wincr; let bub = blb + binc, einsum = 0; const cc1 = cc - 1;
+  for(let wi=1; wi<=wincr; wi++){
+    let elsum = 0; const a = 0.5*(bub+blb), b = 0.5*(bub-blb);
+    for(let jj=1; jj<=nleg; jj++){
+      let j, xx; if(ihalf < jj){ j = nleg - jj + 1; xx = xleg[j-1]; } else { j = jj; xx = -xleg[j-1]; }
+      const ac = a + b*xx, qexpo = ac*ac; if(qexpo > C3) break;
+      const pplus = 2*normCdf(ac), pminus = 2*normCdf(ac - w);
+      let rinsum = pplus*0.5 - pminus*0.5;
+      if(rinsum >= Math.exp(C1/cc1)){ rinsum = aleg[j-1]*Math.exp(-(0.5*qexpo))*Math.pow(rinsum, cc1); elsum += rinsum; }
+    }
+    elsum *= ((2*b)*cc)/Math.sqrt(2*Math.PI); einsum += elsum; blb = bub; bub += binc;
+  }
+  prw += einsum; if(prw <= Math.exp(C1/rr)) return 0;
+  prw = Math.pow(prw, rr); return prw >= 1 ? 1 : prw;
+}
+function ptukey(q, nranges, nmeans, df){ // P(Q < q) para nmeans grupos y df grados de libertad
+  if(!(q>0)) return 0; if(!isFinite(q)) return 1;
+  const rr = nranges, cc = nmeans;
+  const nlegq = 16, ihalfq = 8, eps1 = -30, eps2 = 1e-14, dhaf = 100, dquar = 800, deigh = 5000, dlarg = 25000;
+  const xlegq = [0.989400934991649932596154173450, 0.944575023073232576077988415535, 0.865631202387831743880467897712, 0.755404408355003033895101194847, 0.617876244402643748446671764049, 0.458016777657227386342419442984, 0.281603550779258913230460501460, 0.950125098376374401853193354250e-1];
+  const alegq = [0.271524594117540948517805724560e-1, 0.622535239386478928628438369944e-1, 0.951585116824927848099251076022e-1, 0.124628971255533872052476282192, 0.149595988816576732081501730547, 0.169156519395002538189312079030, 0.182603415044923588866763667969, 0.189450610455068496285396723208];
+  if(df > dlarg) return tukeyWprob(q, rr, cc);
+  const f2 = df*0.5; let f2lf = (f2*Math.log(df) - df*Math.LN2) - gammaLn(f2); const f21 = f2 - 1, ff4 = df*0.25;
+  const ulen = df<=dhaf ? 1 : df<=dquar ? 0.5 : df<=deigh ? 0.25 : 0.125;
+  f2lf += Math.log(ulen);
+  let ans = 0, otsum = 0;
+  for(let i=1; i<=50; i++){
+    otsum = 0; const twa1 = (2*i - 1)*ulen;
+    for(let jj=1; jj<=nlegq; jj++){
+      let j, t1;
+      if(ihalfq < jj){ j = jj - ihalfq - 1; t1 = (f2lf + f21*Math.log(twa1 + xlegq[j]*ulen)) - ((xlegq[j]*ulen + twa1)*ff4); }
+      else { j = jj - 1; t1 = (f2lf + f21*Math.log(twa1 - xlegq[j]*ulen)) + ((xlegq[j]*ulen - twa1)*ff4); }
+      if(t1 >= eps1){
+        const qsqz = ihalfq < jj ? q*Math.sqrt((xlegq[j]*ulen + twa1)*0.5) : q*Math.sqrt((-(xlegq[j]*ulen) + twa1)*0.5);
+        otsum += tukeyWprob(qsqz, rr, cc)*alegq[j]*Math.exp(t1);
+      }
+    }
+    if(i*ulen >= 1 && otsum <= eps2) break;
+    ans += otsum;
+  }
+  return Math.min(1, ans);
+}
+function qtukey(p, nmeans, df){ let lo = 0, hi = 50; for(let i=0;i<80;i++){ const m = (lo+hi)/2; if(ptukey(m, 1, nmeans, df) < p) lo = m; else hi = m; } return (lo+hi)/2; }
+function groupStats(vals){ const n = vals.length, m = vals.reduce((s,v)=>s+v, 0)/n; const v = vals.reduce((s,x)=>s+(x-m)*(x-m), 0)/(n-1); return {n, mean: m, var: v}; }
+// Tukey (Tukey-Kramer si los grupos son de distinto tamaño): supone varianzas iguales
+function tukeyHSD(groups){
+  const st = groups.map(g=>groupStats(g.vals)), k = groups.length, N = st.reduce((s,x)=>s+x.n, 0), df = N - k;
+  const mse = st.reduce((s,x)=>s + (x.n-1)*x.var, 0)/df, qc = qtukey(0.95, k, df), out = [];
+  for(let i=0;i<k;i++) for(let j=i+1;j<k;j++){
+    const diff = st[j].mean - st[i].mean, se = Math.sqrt(mse/2*(1/st[i].n + 1/st[j].n));
+    out.push({a: groups[i].g, b: groups[j].g, diff, lo: diff - qc*se, hi: diff + qc*se, padj: 1 - ptukey(Math.abs(diff)/se, 1, k, df)});
+  }
+  return out;
+}
+// Games-Howell: no supone varianzas iguales
+function gamesHowell(groups){
+  const st = groups.map(g=>groupStats(g.vals)), k = groups.length, out = [];
+  for(let i=0;i<k;i++) for(let j=i+1;j<k;j++){
+    const a = st[i].var/st[i].n, b = st[j].var/st[j].n, se = Math.sqrt(a + b), diff = st[j].mean - st[i].mean;
+    const df = (a+b)*(a+b) / (a*a/(st[i].n-1) + b*b/(st[j].n-1)), qc = qtukey(0.95, k, df);
+    out.push({a: groups[i].g, b: groups[j].g, diff, df, lo: diff - qc*se/Math.SQRT2, hi: diff + qc*se/Math.SQRT2, padj: 1 - ptukey(Math.abs(diff)/se*Math.SQRT2, 1, k, df)});
+  }
+  return out;
+}
+// Comparaciones de a pares con t de Welch, ajustadas por Holm o Bonferroni
+function pairwiseWelch(groups, method='holm'){
+  const st = groups.map(g=>groupStats(g.vals)), out = [];
+  for(let i=0;i<st.length;i++) for(let j=i+1;j<st.length;j++){
+    const a = st[i].var/st[i].n, b = st[j].var/st[j].n, se = Math.sqrt(a+b), t = (st[j].mean - st[i].mean)/se;
+    const df = (a+b)*(a+b)/(a*a/(st[i].n-1) + b*b/(st[j].n-1));
+    out.push({a: groups[i].g, b: groups[j].g, diff: st[j].mean - st[i].mean, t, df, p: tPValue(t, df)});
+  }
+  const adj = pAdjust(out.map(x=>x.p), method); out.forEach((x,i)=>{ x.padj = adj[i]; });
+  return out;
+}
+// --- Shapiro-Wilk (algoritmo AS R94, Royston 1995) ---
+function shapiroWilk(vals){
+  const x = vals.slice().sort((a,b)=>a-b), n = x.length;
+  if(n < 3 || n > 5000) return null;
+  const poly = (c, z)=>{ let r = c[c.length-1]; for(let i=c.length-2;i>=0;i--) r = r*z + c[i]; return r; };
+  const nn2 = Math.floor(n/2), a = new Array(nn2);
+  if(n===3) a[0] = Math.SQRT1_2;
+  else {
+    const an25 = n + 0.25; let summ2 = 0;
+    for(let i=1;i<=nn2;i++){ a[i-1] = normQuantile((i - 0.375)/an25); summ2 += a[i-1]*a[i-1]; }
+    summ2 *= 2; const ssumm2 = Math.sqrt(summ2), rsn = 1/Math.sqrt(n);
+    const a1 = poly([0, 0.221157, -0.147981, -2.07119, 4.434685, -2.706056], rsn) - a[0]/ssumm2;
+    let i1, fac;
+    if(n > 5){ i1 = 3; const a2 = -a[1]/ssumm2 + poly([0, 0.042981, -0.293762, -1.752461, 5.682633, -3.582633], rsn);
+      fac = Math.sqrt((summ2 - 2*a[0]*a[0] - 2*a[1]*a[1]) / (1 - 2*a1*a1 - 2*a2*a2)); a[1] = a2; }
+    else { i1 = 2; fac = Math.sqrt((summ2 - 2*a[0]*a[0]) / (1 - 2*a1*a1)); }
+    a[0] = a1; for(let i=i1;i<=nn2;i++) a[i-1] = -a[i-1]/fac;
+  }
+  const mean = x.reduce((s,v)=>s+v, 0)/n, ss = x.reduce((s,v)=>s+(v-mean)*(v-mean), 0);
+  if(!(ss > 0)) return null;
+  let num = 0; for(let i=0;i<nn2;i++) num += a[i]*(x[n-1-i] - x[i]);
+  let W = Math.min(1, num*num/ss), p;
+  if(n===3){ p = Math.max(0, 1.90985931710274*(Math.asin(Math.sqrt(W)) - 1.04719755119660)); return {W, p: Math.min(1, p), n}; }
+  let w1 = Math.log(1 - W), m, s; const xx = Math.log(n);
+  if(n <= 11){
+    const gamma = poly([-2.273, 0.459], n);
+    if(w1 >= gamma) return {W, p: 1e-19, n};
+    w1 = -Math.log(gamma - w1);
+    m = poly([0.544, -0.39978, 0.025054, -6.714e-4], n); s = Math.exp(poly([1.3822, -0.77857, 0.062767, -0.0020322], n));
+  } else { m = poly([-1.5861, -0.31082, -0.083751, 0.0038915], xx); s = Math.exp(poly([-0.4803, -0.082676, 0.0030302], xx)); }
+  return {W, p: normSf((w1 - m)/s), n};
+}
+// --- Levene, centrado en la mediana (variante de Brown y Forsythe) ---
+function leveneTest(groups){
+  const med = v=>{ const s = v.slice().sort((a,b)=>a-b), n = s.length; return n%2 ? s[(n-1)/2] : (s[n/2-1]+s[n/2])/2; };
+  const z = groups.map(g=>{ const m = med(g.vals); return g.vals.map(v=>Math.abs(v-m)); });
+  const k = z.length, N = z.reduce((s,v)=>s+v.length, 0), grand = z.flat().reduce((s,v)=>s+v, 0)/N;
+  const means = z.map(v=>v.reduce((s,x)=>s+x, 0)/v.length);
+  const ssb = z.reduce((s,v,i)=>s + v.length*(means[i]-grand)*(means[i]-grand), 0);
+  const ssw = z.reduce((s,v,i)=>s + v.reduce((t,x)=>t+(x-means[i])*(x-means[i]), 0), 0);
+  const F = (ssb/(k-1))/(ssw/(N-k));
+  return {F, d1: k-1, d2: N-k, p: fPValue(F, k-1, N-k)};
+}
+// --- Datos pareados: t pareada y Wilcoxon de rangos con signo ---
+function pairedT(x, y){
+  const d = x.map((v,i)=>v - y[i]), n = d.length, st = groupStats(d), se = Math.sqrt(st.var/n), df = n-1;
+  const t = st.mean/se, tc = tQuantile(0.95, df);
+  return {n, meanDiff: st.mean, sd: Math.sqrt(st.var), t, df, p: tPValue(t, df), lo: st.mean - tc*se, hi: st.mean + tc*se, dz: st.mean/Math.sqrt(st.var)};
+}
+function wilcoxonSigned(x, y){
+  const d = x.map((v,i)=>v - y[i]).filter(v=>v!==0), n = d.length, zeros = x.length - n;
+  if(n < 1) return null;
+  const {ranks, tieSum} = rankAvg(d.map(Math.abs));
+  const Wp = d.reduce((s,v,i)=>s + (v>0 ? ranks[i] : 0), 0), Wm = n*(n+1)/2 - Wp, T = Math.min(Wp, Wm);
+  let p, method;
+  if(n <= 50 && tieSum===0 && zeros===0){
+    method = 'exacta';
+    const max = n*(n+1)/2, cnt = new Array(max+1).fill(0); cnt[0] = 1;
+    for(let k=1;k<=n;k++) for(let s=max;s>=k;s--) cnt[s] += cnt[s-k];
+    const tot = Math.pow(2, n); let cdf = 0; for(let s=0;s<=Math.floor(T);s++) cdf += cnt[s];
+    p = Math.min(1, 2*cdf/tot);
+  } else {
+    method = 'aproximación normal';
+    const mn = n*(n+1)/4, se = Math.sqrt(n*(n+1)*(2*n+1)/24 - tieSum/48);
+    p = Math.min(1, 2*normCdf((T - mn)/se));
+  }
+  return {Wplus: Wp, Wminus: Wm, T, n, zeros, p, method};
+}
+// --- Correlación de Spearman ---
+function spearman(x, y){
+  const rx = rankAvg(x).ranks, ry = rankAvg(y).ranks, n = x.length;
+  const mx = rx.reduce((s,v)=>s+v, 0)/n, my = ry.reduce((s,v)=>s+v, 0)/n;
+  let sxy = 0, sxx = 0, syy = 0; for(let i=0;i<n;i++){ sxy += (rx[i]-mx)*(ry[i]-my); sxx += (rx[i]-mx)**2; syy += (ry[i]-my)**2; }
+  const rho = sxy/Math.sqrt(sxx*syy), t = rho*Math.sqrt((n-2)/Math.max(1e-300, 1-rho*rho));
+  return {rho, n, p: Math.abs(rho)>=1 ? 0 : tPValue(t, n-2)};
+}
+// --- ANOVA de dos factores (sumas de cuadrados de tipo II) ---
+// Suma de cuadrados residual de un modelo con las columnas dadas (ortogonalización de Gram-Schmidt; columnas redundantes se descartan)
+function rssOf(cols, y){
+  const basis = [], n = y.length;
+  cols.forEach(c=>{ const v = c.slice(); basis.forEach(b=>{ let dot = 0; for(let i=0;i<n;i++) dot += v[i]*b[i]; for(let i=0;i<n;i++) v[i] -= dot*b[i]; });
+    let nr = 0; for(let i=0;i<n;i++) nr += v[i]*v[i]; nr = Math.sqrt(nr);
+    let orig = 0; for(let i=0;i<n;i++) orig += c[i]*c[i];
+    if(nr > 1e-9*Math.sqrt(orig) && nr > 1e-12) basis.push(v.map(x=>x/nr)); });
+  const r = y.slice(); basis.forEach(b=>{ let dot = 0; for(let i=0;i<n;i++) dot += r[i]*b[i]; for(let i=0;i<n;i++) r[i] -= dot*b[i]; });
+  return {rss: r.reduce((s,v)=>s+v*v, 0), rank: basis.length};
+}
+function twoWayAnova(obs){ // obs: [{a, b, y}]
+  const la = [...new Set(obs.map(o=>o.a))], lb = [...new Set(obs.map(o=>o.b))], n = obs.length;
+  const one = obs.map(()=>1);
+  const dA = la.slice(1).map(l=>obs.map(o=>o.a===l ? 1 : 0)), dB = lb.slice(1).map(l=>obs.map(o=>o.b===l ? 1 : 0));
+  const dAB = []; dA.forEach(ca=>dB.forEach(cb=>dAB.push(ca.map((v,i)=>v*cb[i]))));
+  const y = obs.map(o=>o.y);
+  const mA = rssOf([one, ...dA], y), mB = rssOf([one, ...dB], y), mAB = rssOf([one, ...dA, ...dB], y), mF = rssOf([one, ...dA, ...dB, ...dAB], y);
+  const dfRes = n - mF.rank, msRes = mF.rss/dfRes;
+  const term = (name, ss, df)=>{ const F = df>0 ? (ss/df)/msRes : NaN; return {name, ss, df, F, p: df>0 ? fPValue(F, df, dfRes) : NaN}; };
+  const rows = [term('A', mB.rss - mAB.rss, mAB.rank - mB.rank), term('B', mA.rss - mAB.rss, mAB.rank - mA.rank), term('AB', mAB.rss - mF.rss, mF.rank - mAB.rank)];
+  const ssTot = y.reduce((s,v)=>s+v, 0); const yb = ssTot/n, sst = y.reduce((s,v)=>s+(v-yb)*(v-yb), 0);
+  rows.forEach(r=>{ r.eta2p = r.ss/(r.ss + mF.rss); });
+  return {rows, resid: {ss: mF.rss, df: dfRes}, n, levelsA: la, levelsB: lb, emptyCells: la.length*lb.length - new Set(obs.map(o=>o.a+'\u0000'+o.b)).size, sst};
+}
+// --- Alfa de Cronbach (casos completos) ---
+function cronbachAlpha(items){ // items: matriz casos × ítems (sin faltantes)
+  const n = items.length, k = items[0].length;
+  const varOf = col=>{ const m = col.reduce((s,v)=>s+v, 0)/col.length; return col.reduce((s,v)=>s+(v-m)*(v-m), 0)/(col.length-1); };
+  const cols = Array.from({length:k}, (_,j)=>items.map(r=>r[j])), totals = items.map(r=>r.reduce((s,v)=>s+v, 0));
+  const alphaOf = idx=>{ if(idx.length<2) return NaN; const tv = varOf(items.map(r=>idx.reduce((s,j)=>s+r[j], 0))); const sv = idx.reduce((s,j)=>s+varOf(cols[j]), 0); return idx.length/(idx.length-1)*(1 - sv/tv); };
+  const all = Array.from({length:k}, (_,j)=>j);
+  const corr = (u,v)=>{ const mu = u.reduce((s,x)=>s+x,0)/u.length, mv = v.reduce((s,x)=>s+x,0)/v.length; let a=0,b=0,c=0; for(let i=0;i<u.length;i++){ a += (u[i]-mu)*(v[i]-mv); b += (u[i]-mu)**2; c += (v[i]-mv)**2; } return a/Math.sqrt(b*c); };
+  return {alpha: alphaOf(all), n, k, items: all.map(j=>({alphaIfDeleted: alphaOf(all.filter(x=>x!==j)), itemRest: corr(cols[j], totals.map((t,i)=>t - cols[j][i]))}))};
+}
+/* ===== ESTADÍSTICA I (fin) ===== */
+
 /* ===== COMPARACIÓN DE GRUPOS Y REGRESIÓN: motor (inicio) ===== */
 // Distribuciones: p-valores bilaterales de t y normal, y cuantiles por bisección
 function tPValue(t, df){ if(!isFinite(t)) return 0; if(!(df>0)) return NaN; return betaI(df/2, 0.5, df/(df+t*t)); }
@@ -2442,6 +2732,195 @@ function coefTable(fit, names){
 /* ===== COMPARACIÓN Y REGRESIÓN: motor (fin) ===== */
 
 /* ===== COMPARAR GRUPOS Y REGRESIÓN: interfaz (inicio) ===== */
+/* ===== ESTADÍSTICA I: interfaz (inicio) ===== */
+function pTxt(p){ const s = fmtP(p); return (s.startsWith('<') ? 'p ' : 'p = ') + s; }
+function numFmt(x){ return Math.abs(x)>=1000 ? Math.round(x).toLocaleString('es-AR') : fmtN(x, 2); }
+function valsByGroup(obs, labels){ return labels.map(g=>({g, vals: obs.filter(o=>o.g===g).map(o=>o.y)})).filter(x=>x.vals.length); }
+function quantileOf(sorted, q){ const pos = (sorted.length-1)*q, lo = Math.floor(pos), hi = Math.ceil(pos); return sorted[lo] + (sorted[hi]-sorted[lo])*(pos-lo); }
+// controles de "Comparar grupos" según el diseño y la variable elegidos
+function updateCmpControls(){
+  const design = document.getElementById('cmp-design').value, yv = document.getElementById('cmp-y').value || '', isNum = yv.startsWith('num:');
+  const show = (id, on)=>{ const el = document.getElementById(id); if(el) el.style.display = on ? '' : 'none'; };
+  const pair = design==='pair';
+  [...document.getElementById('cmp-y').options].forEach(o=>{ o.hidden = pair && !o.value.startsWith('num:'); });
+  if(pair && !isNum){ const first = [...document.getElementById('cmp-y').options].find(o=>o.value.startsWith('num:')); if(first) document.getElementById('cmp-y').value = first.value; }
+  const method = document.getElementById('cmp-method').value;
+  show('cmp-y2-wrap', pair); show('cmp-g-wrap', !pair); show('cmp-method-wrap', !pair && isNum); show('cmp-post-wrap', !pair && isNum);
+  show('cmp-g2-wrap', !pair && isNum && method==='param');
+  if(pair) show('cmp-cat-wrap', false); else fillCategorySelect('cmp-y','cmp-cat','cmp-cat-wrap');
+  const post = document.getElementById('cmp-post');
+  [...post.options].forEach(o=>{ o.hidden = method==='rank' && (o.value==='tukey' || o.value==='gh'); });
+  if(method==='rank' && (post.value==='tukey' || post.value==='gh')) post.value = 'holm';
+  document.getElementById('cmp-ylabel').textContent = pair ? 'Primera medición' : 'Comparar';
+}
+// revisión de supuestos de la comparación de promedios
+function assumptionsHtml(gv){
+  const sw = gv.map(x=>({g: x.g, n: x.vals.length, r: x.vals.length>=3 ? shapiroWilk(x.vals) : null}));
+  const lev = gv.length>=2 && gv.every(x=>x.vals.length>=2) ? leveneTest(gv) : null;
+  const nonNormal = sw.filter(s=>s.r && s.r.p<0.05), small = gv.some(x=>x.vals.length<30);
+  let msg = nonNormal.length
+    ? (small ? `En ${nonNormal.length===1 ? 'un grupo' : nonNormal.length+' grupos'} los datos se apartan de la distribución normal y hay grupos de menos de 30 casos: conviene confirmar el resultado con la prueba de rangos (en "Prueba", elegí "Rangos").`
+             : `Algunos grupos se apartan de la distribución normal, pero con 30 casos o más por grupo la comparación de promedios sigue siendo confiable.`)
+    : 'No hay evidencia de que los datos se aparten de la distribución normal.';
+  if(lev) msg += lev.p<0.05 ? ' Las variabilidades difieren entre grupos: por eso se informa la prueba de Welch, que no supone varianzas iguales, y en las comparaciones de a pares conviene Games-Howell.' : ' No hay evidencia de variabilidades distintas entre grupos.';
+  return `<details style="margin:10px 0"><summary style="cursor:pointer;font-size:.88rem"><strong>Revisión de supuestos</strong> — ${nonNormal.length || (lev && lev.p<0.05) ? '<span style="color:var(--rust)">conviene leerla</span>' : 'sin problemas detectados'}</summary>
+    <div class="tablewrap" style="margin-top:6px"><table><thead><tr><th>Grupo</th><th>Casos</th><th>Shapiro-Wilk (normalidad)</th></tr></thead><tbody>${sw.map(s=>`<tr><td>${esc(s.g)}</td><td>${s.n}</td><td>${s.r ? 'W = '+fmtN(s.r.W,3)+', '+pTxt(s.r.p)+(s.r.p<0.05 ? ' <span style="color:var(--rust)">se aparta de la normal</span>' : '') : s.n<3 ? 'muy pocos casos' : 'más de 5000 casos'}</td></tr>`).join('')}</tbody></table></div>
+    ${lev ? `<p class="hint" style="margin:6px 0">Levene (igualdad de variabilidades, centrado en la mediana): F = ${fmtN(lev.F,2)} (gl = ${lev.d1} y ${lev.d2}), ${pTxt(lev.p)}.</p>` : ''}
+    <p class="hint" style="margin:6px 0">${msg} ${glLink('supuestos','¿Qué son los supuestos?')}</p></details>`;
+}
+const POST_NAMES = {tukey:'Tukey (supone variabilidades iguales)', gh:'Games-Howell (no supone variabilidades iguales)', holm:'t de Welch con ajuste de Holm', bonferroni:'t de Welch con ajuste de Bonferroni'};
+function posthocHtml(gv, method){
+  const pairs = method==='tukey' ? tukeyHSD(gv) : method==='gh' ? gamesHowell(gv) : pairwiseWelch(gv, method);
+  const ci = method==='tukey' || method==='gh';
+  return `<p style="margin:12px 0 4px"><strong>Comparaciones de a pares</strong> — ${POST_NAMES[method]}. ${glLink('pares','¿Por qué se ajustan los p?')}</p>
+    <div class="tablewrap"><table><thead><tr><th>Par</th><th>Diferencia</th>${ci ? '<th>IC 95%</th>' : ''}<th>p ajustado</th></tr></thead><tbody>${pairs.map(x=>`<tr><td>${esc(x.b)} − ${esc(x.a)}</td><td>${numFmt(x.diff)}</td>${ci ? `<td>${numFmt(x.lo)} a ${numFmt(x.hi)}</td>` : ''}<td>${fmtP(x.padj)}${x.padj<0.05 ? ' <strong>*</strong>' : ''}</td></tr>`).join('')}</tbody></table></div>
+    <p class="hint" style="margin:4px 0">* Diferencia estadísticamente significativa (p ajustado &lt; 0,05). El ajuste corrige por hacer varias comparaciones a la vez.</p>`;
+}
+function twoWayHtml(ds, rows, col, g, g2){
+  const obs = [];
+  rows.forEach(r=>{ const y = r[col]; if(typeof y!=='number') return; const a = getCategories(ds, r, g)[0], b = getCategories(ds, r, g2)[0];
+    if(a==='(sin dato)' || b==='(sin dato)' || a==null || b==null) return; obs.push({a, b, y}); });
+  const la = [...new Set(obs.map(o=>o.a))], lb = [...new Set(obs.map(o=>o.b))];
+  if(la.length<2 || lb.length<2) return `<p class="hint">Para el análisis de dos factores, "${esc(g2)}" necesita al menos dos categorías con datos.</p>`;
+  if(la.length>12 || lb.length>12) return `<p class="hint">Para el análisis de dos factores, cada variable puede tener hasta 12 categorías.</p>`;
+  const ordOf = (c, lv)=>{ const o = (ds.schema.cols[c]||{}).order || []; const freq = countBy(rows, c, 999).map(x=>x[0]); const pos = v=>{ const i = o.indexOf(v); return i>=0 ? i : 1000 + freq.indexOf(v); }; return lv.slice().sort((a,b)=>pos(a)-pos(b)); };
+  const r = twoWayAnova(obs);
+  r.levelsA = ordOf(g, r.levelsA); r.levelsB = ordOf(g2, r.levelsB);
+  if(!(r.resid.df>0)) return `<p class="hint">No hay suficientes casos para el análisis de dos factores.</p>`;
+  const nm = {A: esc(g), B: esc(g2), AB: 'Interacción '+esc(g)+' × '+esc(g2)};
+  const inter = r.rows[2];
+  const msg = inter.p<0.05 ? `La interacción es significativa (${pTxt(inter.p)}): el efecto de "${esc(g)}" depende de "${esc(g2)}". Conviene mirar los promedios de cada combinación, más que los efectos por separado.`
+    : `La interacción no es significativa (${pTxt(inter.p)}): los efectos de cada factor pueden leerse por separado.`;
+  const cell = (a,b)=>{ const v = obs.filter(o=>o.a===a && o.b===b).map(o=>o.y); return v.length ? numFmt(v.reduce((s,x)=>s+x,0)/v.length)+` <span style="color:var(--sub);font-size:.75rem">(${v.length})</span>` : '—'; };
+  return `<p style="margin:14px 0 4px"><strong>Análisis de dos factores</strong>: "${esc(col)}" según "${esc(g)}" y "${esc(g2)}" (ANOVA, sumas de cuadrados de tipo II, ${r.n} casos). ${glLink('dosfactores','¿Qué es la interacción?')}</p>
+    <div class="tablewrap"><table><thead><tr><th>Fuente</th><th>Suma de cuadrados</th><th>gl</th><th>F</th><th>p</th><th>η² parcial</th></tr></thead><tbody>
+    ${r.rows.map(x=>`<tr><td>${nm[x.name]}</td><td>${numFmt(x.ss)}</td><td>${x.df}</td><td>${fmtN(x.F,2)}</td><td>${fmtP(x.p)}${x.p<0.05 ? ' <strong>*</strong>' : ''}</td><td>${fmtN(x.eta2p,3)}</td></tr>`).join('')}
+    <tr><td>Residuos</td><td>${numFmt(r.resid.ss)}</td><td>${r.resid.df}</td><td></td><td></td><td></td></tr></tbody></table></div>
+    <p style="margin:6px 0">${msg}</p>
+    <div class="tablewrap"><table><thead><tr><th>Promedio (casos)</th>${r.levelsB.map(b=>`<th>${esc(b)}</th>`).join('')}</tr></thead><tbody>${r.levelsA.map(a=>`<tr><td>${esc(a)}</td>${r.levelsB.map(b=>`<td>${cell(a,b)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+    ${r.emptyCells ? `<p class="hint">${r.emptyCells} combinación(es) sin casos: algunos efectos no se pueden estimar por completo.</p>` : ''}`;
+}
+// comparación por rangos (Mann-Whitney o Kruskal-Wallis)
+function renderRankCompare(ds, out, obs, labels, col, g, weighted, postMethod){
+  const gv = valsByGroup(obs, labels);
+  const rows = gv.map(x=>{ const s = x.vals.slice().sort((a,b)=>a-b); return {g: x.g, n: s.length, med: quantileOf(s, 0.5), q1: quantileOf(s, 0.25), q3: quantileOf(s, 0.75)}; });
+  const kw = kruskalWallis(gv);
+  let testTxt;
+  if(gv.length===2){
+    const mw = mannWhitney(gv[0].vals, gv[1].vals);
+    testTxt = `Prueba de Mann-Whitney: U = ${fmtN(mw.U,1)}, ${pTxt(mw.p)} (${mw.method}). Tamaño del efecto: r = ${fmtN(mw.r,2)}. ${mw.p<0.05 ? 'Los valores de un grupo tienden a ser mayores que los del otro (p &lt; 0,05).' : 'No se detecta una diferencia significativa entre grupos (p ≥ 0,05).'}`;
+  } else {
+    testTxt = `Prueba de Kruskal-Wallis: H = ${fmtN(kw.H,2)} (gl = ${kw.df}), ${pTxt(kw.p)}. Tamaño del efecto: ε² = ${fmtN(kw.eps2,3)}. ${kw.p<0.05 ? 'Al menos un grupo difiere de los demás (p &lt; 0,05).' : 'No se detecta una diferencia significativa entre grupos (p ≥ 0,05).'}`;
+  }
+  let html = `<div class="tablewrap"><table><thead><tr><th>${esc(g)}</th><th>Casos</th><th>Mediana</th><th>Rango intercuartil (Q1 – Q3)</th><th>Rango medio</th></tr></thead><tbody>${rows.map((x,i)=>`<tr><td>${esc(x.g)}</td><td>${x.n}</td><td>${numFmt(x.med)}</td><td>${numFmt(x.q1)} – ${numFmt(x.q3)}</td><td>${fmtN(kw.meanRanks[i],1)}</td></tr>`).join('')}</tbody></table></div>`;
+  let post = '';
+  if(gv.length>=3 && postMethod){
+    const m = postMethod==='bonferroni' ? 'bonferroni' : 'holm', dn = dunnTest(gv, m);
+    post = `<p style="margin:12px 0 4px"><strong>Comparaciones de a pares</strong> — prueba de Dunn con ajuste de ${m==='holm' ? 'Holm' : 'Bonferroni'}. ${glLink('pares','¿Por qué se ajustan los p?')}</p><div class="tablewrap"><table><thead><tr><th>Par</th><th>z</th><th>p ajustado</th></tr></thead><tbody>${dn.map(x=>`<tr><td>${esc(x.a)} − ${esc(x.b)}</td><td>${fmtN(x.z,2)}</td><td>${fmtP(x.padj)}${x.padj<0.05 ? ' <strong>*</strong>' : ''}</td></tr>`).join('')}</tbody></table></div><p class="hint" style="margin:4px 0">* Diferencia estadísticamente significativa (p ajustado &lt; 0,05).</p>`;
+  }
+  const notes = [`Prueba de rangos: compara la posición de los valores, sin suponer una distribución normal. Conviene con pocos casos, valores extremos o escalas ordinales.`, weighted ? `Calculada sin ponderar: las pruebas de rangos no tienen una versión estándar para datos ponderados.` : ''].filter(Boolean);
+  out.innerHTML = `<p style="margin:6px 0 10px">Comparación de <strong>"${esc(col)}"</strong> entre grupos de <strong>${esc(g)}</strong> (prueba de rangos).</p>${html}<p style="margin:10px 0 4px">${testTxt}</p>${post}${notes.map(n=>`<p class="hint" style="margin:4px 0">${n}</p>`).join('')}
+    <p class="hint" style="margin:4px 0">${glLink('rangos','¿Qué es una prueba de rangos?')}</p>
+    <div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="mini-export" id="cmp-report">📌 Agregar al informe</button><button type="button" class="mini-export" id="cmp-xlsx">⭳ Excel</button></div>`;
+  document.getElementById('cmp-chart-box').style.display = 'block';
+  destroyChart('c-cmp');
+  charts['c-cmp'] = new Chart(document.getElementById('c-cmp'), {type:'bar', data:{labels: rows.map(x=>x.g), datasets:[{label:'Mediana', data: rows.map(x=>x.med), backgroundColor: palette}]}, options:{indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{title:{display:true, text:'Mediana de '+col}}}}});
+  const title = `Comparación (rangos): ${col} según ${g}`;
+  lastCompare = {title, html: `<p>${testTxt}</p>` + html + post, note: modelNote(ds, notes.join(' '))};
+  logEvent('modelos', `Comparación de grupos por rangos: «${col}» según «${g}» (${obs.length} casos). ${htmlToText(testTxt)}`);
+  document.getElementById('cmp-report').onclick = ()=>addToReport({type:'table', title, html: lastCompare.html, citation: lastCompare.note + ' Calculado con "'+APP_LABEL+'" el '+new Date().toLocaleString('es-AR')+'.'});
+  document.getElementById('cmp-xlsx').onclick = ()=>downloadXLSX(xlsxName('comparacion_rangos_'+col+'_'+g), [{name:'Comparación', aoa: [[g, 'Casos', 'Mediana', 'Q1', 'Q3', 'Rango medio']].concat(rows.map((x,i)=>[x.g, x.n, round2(x.med), round2(x.q1), round2(x.q3), round2(kw.meanRanks[i])]))}], [title, htmlToText(testTxt)].concat(baseNote(title).slice(1)));
+}
+// antes y después: dos mediciones de los mismos casos
+function runPaired(){
+  const ds = datasets[active], out = document.getElementById('cmp-out'); if(!ds) return;
+  const v1 = document.getElementById('cmp-y').value, c2 = document.getElementById('cmp-y2').value;
+  if(!v1.startsWith('num:') || !c2){ out.innerHTML = '<p class="empty">Elegí las dos mediciones numéricas que querés comparar.</p>'; return; }
+  const c1 = v1.slice(4);
+  if(c1===c2){ out.innerHTML = '<p class="empty">Elegí dos columnas distintas.</p>'; return; }
+  const x = [], y = [];
+  getFiltered().forEach(r=>{ if(typeof r[c1]==='number' && typeof r[c2]==='number'){ x.push(r[c1]); y.push(r[c2]); } });
+  if(x.length<3){ out.innerHTML = '<p class="empty">Hacen falta al menos 3 casos con las dos mediciones.</p>'; return; }
+  const t = pairedT(y, x), w = wilcoxonSigned(y, x), sp = spearman(x, y), sw = x.length>=3 ? shapiroWilk(y.map((v,i)=>v - x[i])) : null;
+  const mean = a=>a.reduce((s,v)=>s+v, 0)/a.length, sd = a=>Math.sqrt(groupStats(a).var);
+  const html = `<div class="tablewrap"><table><thead><tr><th>Medición</th><th>Promedio</th><th>Desvío</th></tr></thead><tbody><tr><td>${esc(c1)}</td><td>${numFmt(mean(x))}</td><td>${numFmt(sd(x))}</td></tr><tr><td>${esc(c2)}</td><td>${numFmt(mean(y))}</td><td>${numFmt(sd(y))}</td></tr></tbody></table></div>`;
+  let txt = `Diferencia promedio ("${esc(c2)}" − "${esc(c1)}"): <strong>${numFmt(t.meanDiff)}</strong> (IC 95%: ${numFmt(t.lo)} a ${numFmt(t.hi)}). t pareada = ${fmtN(t.t,2)} (gl = ${t.df}), ${pTxt(t.p)}. ${t.p<0.05 ? 'El cambio entre las dos mediciones es estadísticamente significativo.' : 'No se detecta un cambio significativo entre las dos mediciones.'}`;
+  if(w) txt += ` Prueba de Wilcoxon (rangos con signo): ${pTxt(w.p)} (${w.method}${w.zeros ? ', se excluyen '+w.zeros+' casos sin cambio' : ''}).`;
+  txt += ` Correlación entre las dos mediciones: Spearman ρ = ${fmtN(sp.rho,2)}.`;
+  const notes = [sw && sw.p<0.05 && x.length<30 ? 'Las diferencias se apartan de la distribución normal y hay menos de 30 casos: conviene apoyarse en la prueba de Wilcoxon.' : '', weightsOn(ds) ? 'Calculado sin ponderar: estas pruebas no tienen una versión estándar para datos ponderados.' : ''].filter(Boolean);
+  out.innerHTML = `<p style="margin:6px 0 10px">Comparación de dos mediciones de los mismos casos (<strong>${x.length}</strong> casos con ambos valores).</p>${html}<p style="margin:10px 0 4px">${txt}</p>${notes.map(n=>`<p class="hint" style="margin:4px 0">${n}</p>`).join('')}
+    <p class="hint" style="margin:4px 0">${glLink('pareados','¿Qué son los datos pareados?')} · ${glLink('spearman','¿Qué es la correlación de Spearman?')}</p>
+    <div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="mini-export" id="cmp-report">📌 Agregar al informe</button></div>`;
+  document.getElementById('cmp-chart-box').style.display = 'none';
+  const title = `Antes y después: ${c1} y ${c2}`;
+  lastCompare = {title, html: `<p>${txt}</p>` + html, note: modelNote(ds, notes.join(' '))};
+  logEvent('modelos', `Comparación pareada: «${c1}» y «${c2}» (${x.length} casos). ${htmlToText(txt)}`);
+  document.getElementById('cmp-report').onclick = ()=>addToReport({type:'table', title, html: lastCompare.html, citation: lastCompare.note + ' Calculado con "'+APP_LABEL+'" el '+new Date().toLocaleString('es-AR')+'.'});
+}
+// --- Índices y escalas, con alfa de Cronbach ---
+function indexItemValue(ds, r, c){
+  const sc = ds.schema.cols[c] || {};
+  if(sc.role==='numero'){ const v = r[c]; return typeof v==='number' ? v : null; }
+  const cat = getCategories(ds, r, c)[0]; if(!sc.order || !sc.order.length) return null;
+  const pos = sc.order.indexOf(cat); return pos>=0 ? pos+1 : null;
+}
+function indexCandidates(ds){ return numColumns(ds).map(c=>({c, kind:'número'})).concat(singleCatColumns(ds).filter(c=>((ds.schema.cols[c]||{}).order||[]).length>=3).map(c=>({c, kind:'escala ordenada'}))); }
+function openIndexDialog(){
+  const ds = datasets[active]; if(!ds) return;
+  const cands = indexCandidates(ds);
+  if(cands.length<2){ showModal('Crear un índice', '<p class="empty">Hacen falta al menos dos columnas numéricas o escalas ordenadas (por ejemplo, "Muy de acuerdo … Muy en desacuerdo").</p>'); return; }
+  showModal('Crear un índice a partir de varias preguntas', `
+    <p class="hint">Combina varias preguntas que miden lo mismo (por ejemplo, ítems de una escala de satisfacción) en una sola columna, y mide su consistencia con el alfa de Cronbach. Marcá "invertir" en las preguntas redactadas en sentido contrario. ${glLink('cronbach','¿Qué es el alfa de Cronbach?')}</p>
+    <div class="tablewrap"><table><thead><tr><th>Usar</th><th>Pregunta</th><th>Invertir</th><th>Alfa sin esta pregunta</th><th>Correlación con el resto</th></tr></thead><tbody>
+    ${cands.map((o,i)=>`<tr><td><input type="checkbox" class="ix-use" data-i="${i}"></td><td>${esc(o.c)} <span style="color:var(--sub);font-size:.75rem">(${o.kind})</span></td><td><input type="checkbox" class="ix-inv" data-i="${i}"></td><td class="ix-aid" data-i="${i}"></td><td class="ix-ir" data-i="${i}"></td></tr>`).join('')}
+    </tbody></table></div>
+    <div class="adv-controls" style="margin-top:10px">
+      <div class="field" style="flex:1"><label>Nombre del índice</label><input type="text" id="ix-name" value="Índice"></div>
+      <div class="field"><label>Cálculo</label><select id="ix-method"><option value="mean">Promedio de las preguntas</option><option value="sum">Suma de las preguntas</option></select></div>
+    </div>
+    <p id="ix-alpha" style="margin:8px 0"></p>
+    <button class="go" id="ix-create" disabled>Crear el índice como columna nueva</button>`, {wide:true});
+  const state = ()=>{
+    const use = [...document.querySelectorAll('.ix-use')].filter(c=>c.checked).map(c=>+c.dataset.i);
+    const inv = new Set([...document.querySelectorAll('.ix-inv')].filter(c=>c.checked).map(c=>+c.dataset.i));
+    return {use, inv};
+  };
+  const matrix = (use, inv)=>{
+    const ranges = {}; use.forEach(i=>{ const vals = ds.rows.map(r=>indexItemValue(ds, r, cands[i].c)).filter(v=>v!=null); ranges[i] = [Math.min(...vals), Math.max(...vals)]; });
+    const M = [], rowIdx = [];
+    ds.rows.forEach((r,ri)=>{ const v = use.map(i=>{ const x = indexItemValue(ds, r, cands[i].c); return x==null ? null : inv.has(i) ? ranges[i][0] + ranges[i][1] - x : x; }); if(v.every(x=>x!=null)){ M.push(v); rowIdx.push(ri); } });
+    return {M, rowIdx};
+  };
+  const refresh = ()=>{
+    const {use, inv} = state(), box = document.getElementById('ix-alpha');
+    document.querySelectorAll('.ix-aid, .ix-ir').forEach(td=>{ td.textContent = ''; });
+    document.getElementById('ix-create').disabled = use.length<2;
+    if(use.length<2){ box.innerHTML = '<span class="hint">Marcá al menos dos preguntas.</span>'; return; }
+    const {M} = matrix(use, inv);
+    if(M.length<3){ box.innerHTML = '<span class="hint">Hay muy pocos casos con todas las preguntas respondidas.</span>'; return; }
+    const a = cronbachAlpha(M);
+    a.items.forEach((it,j)=>{ const i = use[j]; document.querySelector(`.ix-aid[data-i="${i}"]`).textContent = use.length>2 ? fmtN(it.alphaIfDeleted,3) : '—'; const ir = document.querySelector(`.ix-ir[data-i="${i}"]`); ir.innerHTML = fmtN(it.itemRest,2) + (it.itemRest<0 ? ' <span style="color:var(--rust)" title="Correlación negativa: ¿hay que invertirla?">⚠</span>' : ''); });
+    const lvl = a.alpha>=0.9 ? 'excelente' : a.alpha>=0.8 ? 'buena' : a.alpha>=0.7 ? 'aceptable' : a.alpha>=0.6 ? 'cuestionable' : 'baja';
+    box.innerHTML = `Alfa de Cronbach: <strong>${fmtN(a.alpha,3)}</strong> (consistencia ${lvl}), con ${a.k} preguntas y ${a.n} casos con todas respondidas.` + (a.items.some(it=>it.itemRest<0) ? ' <span style="color:var(--rust)">Alguna pregunta correlaciona en sentido contrario: revisá si hay que invertirla.</span>' : '');
+  };
+  document.querySelectorAll('.ix-use, .ix-inv').forEach(c=>c.addEventListener('change', refresh)); refresh();
+  document.getElementById('ix-create').onclick = ()=>{
+    const {use, inv} = state(), method = document.getElementById('ix-method').value;
+    let name = document.getElementById('ix-name').value.trim() || 'Índice'; const base = name; let k = 2; while(ds.allCols.includes(name)) name = base+' ('+(k++)+')';
+    const {M, rowIdx} = matrix(use, inv), a = cronbachAlpha(M);
+    ds.rows.forEach(r=>{ r[name] = null; });
+    rowIdx.forEach((ri,j)=>{ const s = M[j].reduce((t,v)=>t+v, 0); ds.rows[ri][name] = method==='mean' ? s/M[j].length : s; });
+    if(!ds.allCols.includes(name)) ds.allCols.push(name);
+    const items = use.map(i=>cands[i].c + (inv.has(i) ? ' (invertida)' : ''));
+    ds.schema.cols[name] = {role:'numero', varLabel: `${method==='mean' ? 'Promedio' : 'Suma'} de: ${items.join(', ')}`};
+    ds.derived = (ds.derived||[]).filter(d=>d.name!==name).concat([{name, items, method, alpha: a.alpha, n: a.n}]);
+    logEvent('tipos', `Índice «${name}» creado en «${ds.label}» como ${method==='mean' ? 'promedio' : 'suma'} de ${items.length} preguntas (${items.join(', ')}); alfa de Cronbach = ${fmtN(a.alpha,3)} (${a.n} casos con todas respondidas).`);
+    closeModal(false);
+    applySchema(ds); buildUI(); persistSession();
+  };
+}
+/* ===== ESTADÍSTICA I: interfaz (fin) ===== */
+
 let lastCompare = null, lastRegression = null;
 function singleCatColumns(ds){ return catColumns(ds).filter(c=>!isMultiColumn(ds, c)); }
 function setupModelControls(ds){
@@ -2452,6 +2931,9 @@ function setupModelControls(ds){
   cg.innerHTML = (ds.rows.some(r=>r.__Año!=null) ? '<option value="Año">Año</option>' : '') + single.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
   if([...cg.options].some(o=>o.value===pg)) cg.value = pg; else if(single[0]) cg.value = single[0];
   fillCategorySelect('cmp-y','cmp-cat','cmp-cat-wrap');
+  const y2 = document.getElementById('cmp-y2'), py2 = y2.value; y2.innerHTML = nums.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join(''); if([...y2.options].some(o=>o.value===py2)) y2.value = py2; else if(nums[1]) y2.value = nums[1];
+  const g2 = document.getElementById('cmp-g2'), pg2 = g2.value; g2.innerHTML = '<option value="">— ninguno —</option>' + single.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join(''); if([...g2.options].some(o=>o.value===pg2)) g2.value = pg2;
+  updateCmpControls();
   // regresión
   const ry = document.getElementById('reg-y'), type = document.getElementById('reg-type').value, pry = ry.value;
   ry.innerHTML = type==='lin' ? nums.map(c=>`<option value="num:${esc(c)}">${esc(c)}</option>`).join('') : cats.map(c=>`<option value="cat:${esc(c)}">${esc(c)}</option>`).join('');
@@ -2474,6 +2956,7 @@ function fillCategorySelect(ySel, catSel, wrapId){
 function modelNote(ds, extra){ return [getFilterSummary(), extra].filter(Boolean).join(' — '); }
 
 function runCompare(){
+  if(document.getElementById('cmp-design').value==='pair') return runPaired();
   const ds = datasets[active], out = document.getElementById('cmp-out'); if(!ds) return;
   const yv = document.getElementById('cmp-y').value, g = document.getElementById('cmp-g').value;
   if(!yv || !g){ out.innerHTML = '<p class="empty">Elegí qué comparar y entre qué grupos.</p>'; return; }
@@ -2492,7 +2975,17 @@ function runCompare(){
   if(groups.length<2){ out.innerHTML = '<p class="empty">Hace falta al menos dos grupos con datos.</p>'; return; }
   const small = groups.filter(x=>x.n<2);
   if(isNum && small.length){ out.innerHTML = `<p class="empty">Algún grupo tiene menos de 2 casos (${small.map(x=>esc(x.g)).join(', ')}): no se puede calcular su variabilidad.</p>`; return; }
+  const method = isNum ? document.getElementById('cmp-method').value : 'param';
+  if(isNum && method==='rank') return renderRankCompare(ds, out, obs, groups.map(x=>x.g), col, g, weighted, document.getElementById('cmp-post').value);
   const test = isNum ? compareMeans(groups, weighted, obs.length) : compareProps(groups, weighted, obs.length);
+  let extra = '';
+  if(isNum){
+    const gv = valsByGroup(obs, groups.map(x=>x.g)), pm = document.getElementById('cmp-post').value, g2 = document.getElementById('cmp-g2').value;
+    extra += assumptionsHtml(gv);
+    if(gv.length>=3 && pm) extra += posthocHtml(gv, pm);
+    if(g2 && g2!==g) extra += twoWayHtml(ds, rows, col, g, g2);
+    if(weighted && ((gv.length>=3 && pm) || (g2 && g2!==g))) extra += '<p class="hint">Las comparaciones de a pares y el análisis de dos factores se calculan sin ponderar.</p>';
+  }
   const pct = x=>(x*100).toFixed(1).replace('.',',')+'%';
   const num = x=>Math.abs(x)>=1000 ? Math.round(x).toLocaleString('es-AR') : fmtN(x, 2);
   const val = x=>isNum ? num(x) : pct(x);
@@ -2514,7 +3007,7 @@ function runCompare(){
     if(pmain!=null) testTxt += ` ${pmain<0.05 ? 'La diferencia entre grupos es estadísticamente significativa (p < 0,05).' : 'No se detecta una diferencia significativa entre grupos (p ≥ 0,05).'}`;
   }
   const notes = [weighted ? `Ponderado por "${esc(weightColumn(ds))}": promedios y porcentajes con error estándar de diseño (cada caso como unidad de muestreo).` : '', order.length>12 ? `Se comparan los 12 grupos más frecuentes de ${order.length}.` : '', `Casos usados: ${obs.length} (con dato en las dos variables).`].filter(Boolean);
-  out.innerHTML = `<p style="margin:6px 0 10px">Comparación del <strong>${esc(what)}</strong> entre grupos de <strong>${esc(g)}</strong>.</p>${html}<p style="margin:10px 0 4px">${testTxt}</p>${notes.map(n=>`<p class="hint" style="margin:4px 0">${n}</p>`).join('')}
+  out.innerHTML = `<p style="margin:6px 0 10px">Comparación del <strong>${esc(what)}</strong> entre grupos de <strong>${esc(g)}</strong>.</p>${html}<p style="margin:10px 0 4px">${testTxt}</p>${extra}${notes.map(n=>`<p class="hint" style="margin:4px 0">${n}</p>`).join('')}
     <p class="hint" style="margin:4px 0">${glLink(isNum ? 'ttest' : 'chi2', isNum ? '¿Qué prueba se usó?' : '¿Qué es el χ²?')} · ${glLink('ic','Intervalo de confianza')}</p>
     <div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="mini-export" id="cmp-report">📌 Agregar al informe</button><button type="button" class="mini-export" id="cmp-xlsx">⭳ Excel</button></div>`;
   // gráfico con márgenes de error
@@ -2523,7 +3016,7 @@ function runCompare(){
   const vals = groups.map(x=>isNum ? x.mean : x.p*100), ci = groups.map(x=>isNum ? [x.lo, x.hi] : [x.lo*100, x.hi*100]);
   charts['c-cmp'] = new Chart(document.getElementById('c-cmp'), {type:'bar', data:{labels: groups.map(x=>x.g), datasets:[{label: isNum ? 'Promedio' : '%', data: vals, ci, backgroundColor: palette}]},
     options:{indexAxis:'y', plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>(isNum ? num(c.parsed.x) : c.parsed.x.toFixed(1).replace('.',',')+'%')+' (IC 95%: '+(isNum ? num(ci[c.dataIndex][0])+' a '+num(ci[c.dataIndex][1]) : ci[c.dataIndex].map(v=>v.toFixed(1).replace('.',',')).join('–')+'%')+')'}}}, scales:{x:{beginAtZero: !isNum || Math.min(...ci.map(c=>c[0]))>0, suggestedMax: Math.max(...ci.map(c=>c[1]))*1.05}}}});
-  lastCompare = {title:`Comparación: ${what} según ${g}`, html: `<p>${esc(testTxt)}</p>`+html, note: modelNote(ds, notes.map(htmlToText).join(' ')), groups, isNum, g};
+  lastCompare = {title:`Comparación: ${what} según ${g}`, html: `<p>${esc(testTxt)}</p>`+html+extra, note: modelNote(ds, notes.map(htmlToText).join(' ')), groups, isNum, g};
   logEvent('modelos', `Comparación de grupos: ${what} según «${g}» (${obs.length} casos${weighted ? ', ponderado' : ''}). ${htmlToText(testTxt)}`);
   document.getElementById('cmp-report').onclick = ()=>{ addToReport({type:'table', title: lastCompare.title, html: lastCompare.html, citation: lastCompare.note + ' Calculado con "'+APP_LABEL+'" el '+new Date().toLocaleString('es-AR')+'.'}); document.getElementById('cmp-report').textContent = '✓ Agregado'; };
   document.getElementById('cmp-xlsx').onclick = ()=>{
@@ -2751,6 +3244,8 @@ function buildAnnexHtml(){
   if(used.weights) h += '<li>Datos ponderados: conteos y porcentajes suman los pesos. La prueba de asociación usa la corrección de Rao-Scott de segundo orden (equivalente a svychisq del paquete survey de R), considerando el efecto de los ponderadores; no incluye estratos ni conglomerados.</li>';
   h += '<li>Márgenes de error (cuando se informan): intervalos de confianza del 95% de Wilson, con tamaño de muestra efectivo derivado de la varianza linealizada si hay ponderador. Solo corresponden a datos muestrales.</li>';
   h += '<li>Valores con varias partes: la coma, la barra y el guion con espacios separan siempre; la conjunción "y" separa solo si todas las partes aparecen como valores sueltos en otras celdas de la misma columna.</li>';
+  { const der = Object.values(datasets).flatMap(d=>(d.derived||[]).map(x=>Object.assign({base: d.label}, x)));
+    if(der.length) h += `<li>Índices construidos: ${der.map(x=>`«${esc(x.name)}» en «${esc(x.base)}» (${x.method==='mean' ? 'promedio' : 'suma'} de ${esc(x.items.join(', '))}; alfa de Cronbach = ${fmtN(x.alpha,3)}, ${x.n} casos con todas las preguntas respondidas)`).join('; ')}. Los casos con alguna pregunta sin responder quedan sin valor en el índice.</li>`; }
   { const nOcr = Object.values(qualDocs).reduce((s,d)=>s+d.entries.filter(e=>e.ocr).length, 0);
     if(nOcr) h += `<li>Transcripción por OCR: ${nOcr} relato(s) se obtuvieron de imágenes (fotos, capturas o PDF escaneados) con ${OCR_ENGINE}, procesando por separado las zonas de texto marcadas en orden de lectura y descartando los renglones de baja confianza; el texto se revisó y corrigió manualmente antes de guardarlo. Cada relato conserva la referencia a su imagen de origen.</li>`; }
   if(methodLog.some(e=>e.kind==='modelos')) h += '<li>Comparación de grupos: promedios con prueba t de Welch (dos grupos) o ANOVA clásico y de Welch (más grupos); porcentajes con χ². Regresión lineal por mínimos cuadrados y logística por máxima verosimilitud, con casos completos; las variables categóricas se incluyen con una categoría de referencia (la más frecuente o la primera de una escala ordenada).'+(used.weights ? ' Con ponderador: estimaciones ponderadas, errores estándar robustos de diseño (sándwich con factor n/(n−1), equivalente a svyglm y svymean del paquete survey de R con cada caso como unidad de muestreo), pruebas de Wald y Rao-Scott.' : '')+' Las especificaciones y resultados figuran en el registro.</li>';
@@ -5669,11 +6164,12 @@ function updateCorrelation(){
     if(y-p===1) diffs.push([byYear[y]-byYear[p], seriesMap[y]-seriesMap[p]]);
   }
   const rd = diffs.length>=4 ? pearson(diffs) : null;
+  const rs = spearman(years.map(y=>byYear[y]), years.map(y=>seriesMap[y]));
   const strength = v=>Math.abs(v)<0.3?'débil':Math.abs(v)<0.6?'moderada':'fuerte';
   const dir = v=>v<0 ? 'negativa' : 'positiva';
   const fmtR = v=>v.toFixed(2).replace('.',',');
   const what = measureCol ? `suma de "${esc(measureCol)}"` : 'cantidad de registros';
-  let html = `Correlación entre "${esc(ds.label)}" (${what}) y "${esc(resolveSeriesLabel(sel.value))}", n = ${years.length} años: <strong>r = ${fmtR(r)}</strong> (${strength(r)}, ${dir(r)}).`;
+  let html = `Correlación entre "${esc(ds.label)}" (${what}) y "${esc(resolveSeriesLabel(sel.value))}", n = ${years.length} años: <strong>r = ${fmtR(r)}</strong> (${strength(r)}, ${dir(r)}). Por rangos (Spearman): ρ = ${fmtR(rs.rho)}.`;
   if(rd!=null){
     html += ` Sobre las variaciones interanuales (n = ${diffs.length}): <strong>r = ${fmtR(rd)}</strong> (${strength(rd)}, ${dir(rd)}).`;
     if(Math.abs(r)>=0.5 && Math.abs(rd)<0.3) html += ` <span style="color:var(--rust)">La correlación de los niveles es alta pero la de las variaciones es débil: probablemente ambas series solo comparten una tendencia de largo plazo, no un vínculo año a año.</span>`;
@@ -7092,6 +7588,13 @@ function setupHelp(){
   });
 }
 const GLOSSARY = [
+  ['rangos','Pruebas de rangos (no paramétricas)','Comparan grupos según la posición (el rango) de cada valor, en lugar del promedio: Mann-Whitney para dos grupos y Kruskal-Wallis para tres o más. No suponen que los datos sigan una distribución normal, por eso convienen con pocos casos, con valores extremos o con escalas ordinales. Informan medianas y rangos medios.'],
+  ['pares','Comparaciones de a pares y ajuste de p','Cuando hay tres o más grupos, la prueba general dice si hay alguna diferencia, pero no cuál. Las comparaciones de a pares revisan cada par. Como hacer muchas pruebas aumenta la chance de encontrar diferencias por azar, los p se ajustan: Tukey (supone variabilidades iguales), Games-Howell (no lo supone), Holm o Bonferroni (más conservador). Con pruebas de rangos se usa la prueba de Dunn.'],
+  ['supuestos','Supuestos de una prueba','Condiciones bajo las que una prueba funciona bien. La comparación de promedios supone datos aproximadamente normales en cada grupo (se revisa con Shapiro-Wilk) y, en su versión clásica, variabilidades iguales (se revisa con Levene). Con 30 casos o más por grupo, la normalidad importa poco; si no se cumple con grupos chicos, conviene la prueba de rangos.'],
+  ['pareados','Datos pareados (antes y después)','Dos mediciones de los mismos casos, por ejemplo antes y después de una intervención. Se analiza la diferencia de cada caso: t pareada (promedio de las diferencias) o Wilcoxon de rangos con signo (sin suponer normalidad). Es más preciso que comparar dos grupos distintos, porque cada caso es su propio control.'],
+  ['dosfactores','ANOVA de dos factores e interacción','Analiza cómo varía un promedio según dos variables a la vez (por ejemplo, sexo y nivel educativo). La interacción indica si el efecto de una depende de la otra: si es significativa, conviene mirar cada combinación. Se usan sumas de cuadrados de tipo II, adecuadas para grupos de distinto tamaño. El η² parcial indica qué parte de la variación explica cada factor.'],
+  ['spearman','Correlación de Spearman','Correlación calculada sobre los rangos de los valores, en lugar de los valores mismos. Mide si dos variables crecen juntas aunque no lo hagan en línea recta, y es menos sensible a valores extremos que la r de Pearson. Va de −1 a 1.'],
+  ['cronbach','Índices y alfa de Cronbach','Un índice combina varias preguntas que miden lo mismo en un solo valor (promedio o suma). El alfa de Cronbach mide su consistencia interna: desde 0,7 se considera aceptable, desde 0,8 buena. Las preguntas redactadas en sentido contrario se invierten antes de combinarlas; una correlación negativa con el resto suele indicar que falta invertir una.'],
   ['casos-validos','Porcentaje sobre casos válidos','Los porcentajes se calculan sobre los registros que tienen un valor en esa variable: los "sin dato" y los valores marcados como perdidos (ej. Ns/Nc) quedan fuera de la base.'],
   ['multiple','Respuesta múltiple / varios valores por celda','Cuando un mismo caso puede tener varias categorías (ej. "Huelga, Piquete", o una pregunta de "marque todas las que correspondan"), los porcentajes se calculan sobre los casos y pueden sumar más de 100%.'],
   ['ponderacion','Ponderador y N ponderado','En una encuesta por muestreo, cada caso representa a una cantidad de personas de la población (su "peso"). Con el ponderador activo, los conteos suman esos pesos: el N ponderado estima el tamaño de la población, y los porcentajes la representan a ella y no solo a la muestra.'],
