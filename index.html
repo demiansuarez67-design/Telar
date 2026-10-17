@@ -495,6 +495,24 @@ tbody tr:hover{background:var(--accent-bg)}
       <button class="mini-export" id="codes-report-btn" style="margin-top:10px">📌 Agregar al informe</button> <button class="mini-export" id="codes-xlsx-btn" style="margin-top:10px">⭳ Excel</button>
     </div>
   </section>
+  <section class="card" id="words-section" style="display:none">
+    <h2>Análisis de palabras</h2>
+    <p class="hint">Frecuencias de palabras, cada palabra en su contexto y palabras características de cada grupo (tópico, año, entrevista, hablante), sobre los relatos o las entrevistas. Con seudónimos activos, se aplican en todo lo que se muestra o exporta.</p>
+    <div class="adv-controls">
+      <div class="field"><label>Fuente</label><select id="wa-source"></select></div>
+      <div class="field"><label>Análisis</label><select id="wa-mode"><option value="freq">Palabras más frecuentes</option><option value="kwic">Palabra en contexto</option><option value="keys">Palabras características por grupo</option></select></div>
+      <div class="field" id="wa-term-wrap" style="display:none"><label>Palabra (con * para variantes: pesc*)</label><input type="text" id="wa-term" placeholder="ej. despido"></div>
+      <div class="field" id="wa-group-wrap" style="display:none"><label>Grupos</label><select id="wa-group"></select></div>
+      <button class="go" id="wa-run" style="align-self:flex-end">Analizar</button>
+    </div>
+    <div id="wa-opts" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:6px 0 10px">
+      <label class="chk-opt"><input type="checkbox" id="wa-stop" checked> Excluir palabras vacías (de, que, la…)</label>
+      <label class="chk-opt"><input type="checkbox" id="wa-bi"> Pares de palabras</label>
+      <label class="hint" style="margin:0">Mínimo de letras <input type="number" id="wa-min" value="3" min="1" max="15" style="width:52px"></label>
+      <label class="hint" style="margin:0;flex:1;min-width:200px">Excluir también <input type="text" id="wa-excl" placeholder="palabras separadas por coma" style="width:100%"></label>
+    </div>
+    <div id="wa-out"></div>
+  </section>
   </div>
 
   <div class="main-panel" id="panel-biblio" role="tabpanel" aria-labelledby="tab-biblio" hidden>
@@ -568,7 +586,7 @@ tbody tr:hover{background:var(--accent-bg)}
 
 <script>
 // ===== Versión de Telar (al publicar una nueva, cambiar acá y en sw.js) =====
-const APP_VERSION = '0.11.0';
+const APP_VERSION = '0.12.0';
 const APP_CHANNEL = 'beta';
 const APP_LABEL = 'Telar ' + APP_VERSION + ' ' + APP_CHANNEL;
 // Dirección del formulario de comentarios (ej. un Formulario de Google). Vacía: se explica cómo configurarla.
@@ -817,6 +835,9 @@ document.getElementById('chk-percent').addEventListener('change', e=>{
 let showTrend = false;
 document.getElementById('cross-xlsx-btn').addEventListener('click', exportCrossXLSX);
 document.getElementById('cmp-run').addEventListener('click', runCompare);
+document.getElementById('wa-run').addEventListener('click', runWords);
+['wa-mode','wa-source'].forEach(id=>document.getElementById(id).addEventListener('change', waControls));
+document.getElementById('wa-term').addEventListener('keydown', e=>{ if(e.key==='Enter') runWords(); });
 ['cmp-design','cmp-y','cmp-method'].forEach(id=>document.getElementById(id).addEventListener('change', updateCmpControls));
 document.getElementById('ds-index-btn').addEventListener('click', openIndexDialog);
 document.getElementById('reg-run').addEventListener('click', runRegression);
@@ -3179,7 +3200,7 @@ function schemaSummary(ds){
     return '«'+displayColName(c)+'»: '+((ROLES[sc.role]||{}).label||sc.role)+(d ? ' ('+d+')' : ''); }).join('; ')
     + ((ds.schema.sets||[]).length ? '. Preguntas de respuesta múltiple: '+ds.schema.sets.map(st=>'«'+st.name+'» = '+st.members.join(' + ')).join('; ') : '');
 }
-const LOG_KIND = {ocr:'OCR', modelos:'Comparaciones y modelos', equipo:'Trabajo en equipo', codigos:'Códigos', entrevistas:'Entrevistas', carga:'Carga de datos', tipos:'Tipos de columna', topicos:'Tópicos', ponderacion:'Ponderación', separar:'Valores múltiples', informe:'Informe', periodo:'Períodos', privacidad:'Privacidad', base:'Bases'};
+const LOG_KIND = {texto:'Análisis de texto', ocr:'OCR', modelos:'Comparaciones y modelos', equipo:'Trabajo en equipo', codigos:'Códigos', entrevistas:'Entrevistas', carga:'Carga de datos', tipos:'Tipos de columna', topicos:'Tópicos', ponderacion:'Ponderación', separar:'Valores múltiples', informe:'Informe', periodo:'Períodos', privacidad:'Privacidad', base:'Bases'};
 
 // Para lo que se comparte (anexo): nombres de archivo de entrevistas y nombres reales se reemplazan por seudónimos
 function scrubForSharing(text){
@@ -3246,6 +3267,7 @@ function buildAnnexHtml(){
   h += '<li>Valores con varias partes: la coma, la barra y el guion con espacios separan siempre; la conjunción "y" separa solo si todas las partes aparecen como valores sueltos en otras celdas de la misma columna.</li>';
   { const der = Object.values(datasets).flatMap(d=>(d.derived||[]).map(x=>Object.assign({base: d.label}, x)));
     if(der.length) h += `<li>Índices construidos: ${der.map(x=>`«${esc(x.name)}» en «${esc(x.base)}» (${x.method==='mean' ? 'promedio' : 'suma'} de ${esc(x.items.join(', '))}; alfa de Cronbach = ${fmtN(x.alpha,3)}, ${x.n} casos con todas las preguntas respondidas)`).join('; ')}. Los casos con alguna pregunta sin responder quedan sin valor en el índice.</li>`; }
+  if(methodLog.some(e=>e.kind==='texto')) h += `<li>Análisis de palabras: el texto se divide en palabras (secuencias de letras, en minúsculas, sin lematizar), excluyendo las palabras vacías del español según una lista fija de ${STOP_ES.size} palabras cuando se indica. Las palabras características de cada grupo se identifican por log-verosimilitud (G², Rayson y Garside, 2000), comparando su frecuencia en el grupo con la del resto de los textos; se listan las que aparecen al menos 3 veces y proporcionalmente más en el grupo.</li>`;
   { const nOcr = Object.values(qualDocs).reduce((s,d)=>s+d.entries.filter(e=>e.ocr).length, 0);
     if(nOcr) h += `<li>Transcripción por OCR: ${nOcr} relato(s) se obtuvieron de imágenes (fotos, capturas o PDF escaneados) con ${OCR_ENGINE}, procesando por separado las zonas de texto marcadas en orden de lectura y descartando los renglones de baja confianza; el texto se revisó y corrigió manualmente antes de guardarlo. Cada relato conserva la referencia a su imagen de origen.</li>`; }
   if(methodLog.some(e=>e.kind==='modelos')) h += '<li>Comparación de grupos: promedios con prueba t de Welch (dos grupos) o ANOVA clásico y de Welch (más grupos); porcentajes con χ². Regresión lineal por mínimos cuadrados y logística por máxima verosimilitud, con casos completos; las variables categóricas se incluyen con una categoría de referencia (la más frecuente o la primera de una escala ordenada).'+(used.weights ? ' Con ponderador: estimaciones ponderadas, errores estándar robustos de diseño (sándwich con factor n/(n−1), equivalente a svyglm y svymean del paquete survey de R con cada caso como unidad de muestreo), pruebas de Wald y Rao-Scott.' : '')+' Las especificaciones y resultados figuran en el registro.</li>';
@@ -4810,6 +4832,130 @@ function printReport(){
 }
 /* ===== INFORME EN WORD Y PDF (fin) ===== */
 
+/* ===== ANÁLISIS DE PALABRAS (inicio) ===== */
+// Palabras vacías del español: no aportan contenido por sí mismas (artículos, preposiciones, auxiliares, muletillas)
+const STOP_ES = new Set(('a al algo alguna algunas alguno algunos ante antes aquel aquella aquellas aquellos aqui aquí asi así aun aún bien bueno cada casi como cómo con contra cual cuales cuál cuando cuándo cuanto de del desde donde dónde dos durante e el él ella ellas ello ellos en entonces entre era eran eres es esa esas ese eso esos esta está estaba estaban estado estamos estan están estar estas este esto estos estoy estuvo fue fueron fui ha había habia habían han has hasta hay he hemos hizo hace hacer hacia hacía ir la las le les lo los más mas me mi mí mis mismo misma mismos mismas mucho muchos mucha muchas muy nada ni no nos nosotros nuestra nuestro nuestras nuestros o os otra otras otro otros para pero poco pocos por porque qué que quien quién quienes se sea según ser será si sí siempre sin sino sobre solo sólo son su sus tal también tambien tan tanto te tenemos tener tengo tenía tiene tienen toda todas todo todos tras tu tú tus un una uno unos unas usted ustedes vos y ya yo eh mm ah este esta digamos o sea pues tipo vez veces dijo dice decir digo creo cosa cosas acá ahí allá allí así entonces igual medio onda va van voy vamos ver ser estar sido siendo cual también había fue años año día días').split(' '));
+function waTokens(text, minLen){ return (String(text||'').toLowerCase().match(/\p{L}+/gu) || []).filter(w=>w.length>=minLen); }
+// unidades de texto: relatos o intervenciones de entrevistas, con sus atributos para agrupar
+function waUnits(source){
+  const out = [];
+  if(source==='rel'){
+    Object.values(qualDocs).forEach(doc=>doc.entries.forEach((en, i)=>{
+      out.push({text: en.cuerpo || en.texto || '', ref: `${doc.label} · ${en.dia ? String(en.dia).padStart(2,'0')+'/' : ''}${en.mes ? String(en.mes).padStart(2,'0')+'/' : ''}${en.anio||''}`,
+        groups: {topico: (en.topicos||[]).length ? en.topicos : ['(sin tópico)'], keyword: (en.keywords||[]).length ? en.keywords : ['(sin palabra clave)'], anio: [en.anio ? String(en.anio) : '(sin año)'], doc: [doc.label]}});
+    }));
+  } else {
+    Object.values(interviews).forEach(iv=>{
+      const title = interviewDisplayLabel(iv); // con seudónimos, si están activos
+      iv.turns.forEach(t=>{
+        const r = ((iv.speakers||{})[t.label] || {}).role || 'entrevistado'; if(source==='ivr' && r==='entrevistador') return;
+        out.push({text: applyPseudo(iv, t.text||''), ref: title, groups: {entrevista: [title], hablante: [speakerName(iv, t.label)], rol: [r==='entrevistador' ? 'Entrevistador/a' : 'Entrevistado/a']}});
+      });
+    });
+  }
+  return out;
+}
+function waOptions(){
+  const excl = new Set(document.getElementById('wa-excl').value.toLowerCase().split(/[,;\s]+/).filter(Boolean));
+  return {minLen: Math.max(1, +document.getElementById('wa-min').value || 3), stop: document.getElementById('wa-stop').checked, bigrams: document.getElementById('wa-bi').checked, excl};
+}
+function waTerms(text, o){ // palabras (o pares de palabras) de un texto, sin palabras vacías ni excluidas
+  const toks = waTokens(text, 1), keep = w=>w.length>=o.minLen && !(o.stop && STOP_ES.has(w)) && !o.excl.has(w);
+  if(!o.bigrams) return toks.filter(keep);
+  const out = []; for(let i=0;i+1<toks.length;i++) if(keep(toks[i]) && keep(toks[i+1])) out.push(toks[i]+' '+toks[i+1]);
+  return out;
+}
+function waFrequencies(units, o, top=40){
+  const cnt = new Map(), docs = new Map(); let total = 0;
+  units.forEach((u,ui)=>{ const seen = new Set(); waTerms(u.text, o).forEach(w=>{ cnt.set(w, (cnt.get(w)||0)+1); total++; if(!seen.has(w)){ seen.add(w); docs.set(w, (docs.get(w)||0)+1); } }); });
+  return {total, units: units.length, rows: [...cnt.entries()].sort((a,b)=>b[1]-a[1] || a[0].localeCompare(b[0])).slice(0, top).map(([w,n])=>({w, n, docs: docs.get(w), per1000: 1000*n/Math.max(1,total)}))};
+}
+// palabra en contexto; "pesc*" busca todas las palabras que empiezan con "pesc"
+function waKwic(units, term, width=60, max=500){
+  const t = term.trim().toLowerCase(); if(!t) return {rows: [], total: 0};
+  const prefix = t.endsWith('*'), base = prefix ? t.slice(0,-1) : t, rows = []; let total = 0;
+  const multi = /\s/.test(base);
+  units.forEach(u=>{
+    const txt = String(u.text||''), low = txt.toLowerCase();
+    if(multi){ let i = low.indexOf(base); while(i>=0){ total++; if(rows.length<max) rows.push({left: txt.slice(Math.max(0,i-width), i), hit: txt.slice(i, i+base.length), right: txt.slice(i+base.length, i+base.length+width), ref: u.ref}); i = low.indexOf(base, i+base.length); } return; }
+    for(const m of txt.matchAll(/\p{L}+/gu)){ const w = m[0].toLowerCase(); if(prefix ? w.startsWith(base) : w===base){ total++; if(rows.length<max){ const i = m.index; rows.push({left: txt.slice(Math.max(0,i-width), i), hit: m[0], right: txt.slice(i+m[0].length, i+m[0].length+width), ref: u.ref}); } } }
+  });
+  return {rows, total};
+}
+// palabras características de cada grupo: log-verosimilitud (G², Rayson y Garside 2000) frente al resto
+function waLogLik(a, b, c, d){ const e1 = c*(a+b)/(c+d), e2 = d*(a+b)/(c+d); return 2*((a>0 ? a*Math.log(a/e1) : 0) + (b>0 ? b*Math.log(b/e2) : 0)); }
+function waKeyness(units, o, groupKey, perGroup=10, minFreq=3){
+  const gs = new Map();
+  units.forEach((u,ui)=>(u.groups[groupKey]||[]).forEach(g=>{ if(!gs.has(g)) gs.set(g, []); gs.get(g).push(ui); }));
+  const termsOf = units.map(u=>waTerms(u.text, o)), all = new Map(); let N = 0;
+  termsOf.forEach(ts=>ts.forEach(w=>{ all.set(w, (all.get(w)||0)+1); N++; }));
+  const out = [];
+  [...gs.entries()].sort((x,y)=>y[1].length-x[1].length).forEach(([g, idx])=>{
+    const cnt = new Map(); let c = 0; idx.forEach(i=>termsOf[i].forEach(w=>{ cnt.set(w, (cnt.get(w)||0)+1); c++; }));
+    const d = N - c; if(c===0 || d<=0){ out.push({g, units: idx.length, tokens: c, words: []}); return; }
+    const words = [];
+    cnt.forEach((a, w)=>{ if(a<minFreq) return; const b = all.get(w) - a; if(a/c <= b/d) return; const G2 = waLogLik(a, b, c, d); words.push({w, a, b, G2, p: chi2Sf(G2, 1), inGroup: 1000*a/c, inRest: 1000*b/d}); });
+    words.sort((x,y)=>y.G2-x.G2);
+    out.push({g, units: idx.length, tokens: c, words: words.slice(0, perGroup)});
+  });
+  return out;
+}
+const WA_GROUPS = {rel: [['topico','Tópico'],['keyword','Palabra clave'],['anio','Año'],['doc','Documento']], ivr: [['entrevista','Entrevista'],['hablante','Hablante']], iva: [['rol','Rol (entrevistador/a o entrevistado/a)'],['entrevista','Entrevista'],['hablante','Hablante']]};
+function renderWordsUI(){
+  const sec = document.getElementById('words-section'); if(!sec) return;
+  const hasRel = Object.values(qualDocs).some(d=>d.entries.length), hasIv = Object.keys(interviews).length>0;
+  sec.style.display = hasRel || hasIv ? '' : 'none'; if(!hasRel && !hasIv) return;
+  const src = document.getElementById('wa-source'), prev = src.value;
+  src.innerHTML = (hasRel ? '<option value="rel">Relatos</option>' : '') + (hasIv ? '<option value="ivr">Entrevistas: respuestas</option><option value="iva">Entrevistas: todas las intervenciones</option>' : '');
+  if([...src.options].some(o=>o.value===prev)) src.value = prev;
+  waControls();
+}
+function waControls(){
+  const mode = document.getElementById('wa-mode').value, src = document.getElementById('wa-source').value;
+  document.getElementById('wa-term-wrap').style.display = mode==='kwic' ? '' : 'none';
+  document.getElementById('wa-group-wrap').style.display = mode==='keys' ? '' : 'none';
+  document.getElementById('wa-opts').style.display = mode==='kwic' ? 'none' : '';
+  const gsel = document.getElementById('wa-group'), pv = gsel.value;
+  gsel.innerHTML = (WA_GROUPS[src]||[]).map(([k,l])=>`<option value="${k}">${l}</option>`).join(''); if([...gsel.options].some(o=>o.value===pv)) gsel.value = pv;
+}
+function runWords(){
+  const out = document.getElementById('wa-out'), src = document.getElementById('wa-source').value, mode = document.getElementById('wa-mode').value;
+  const units = waUnits(src), o = waOptions(), srcName = document.getElementById('wa-source').selectedOptions[0].textContent;
+  if(!units.length){ out.innerHTML = '<p class="empty">No hay textos en esta fuente.</p>'; return; }
+  const optTxt = `${o.bigrams ? 'pares de palabras' : 'palabras'} de ${o.minLen} letras o más${o.stop ? ', sin palabras vacías' : ''}${o.excl.size ? ', excluyendo: '+[...o.excl].join(', ') : ''}`;
+  let html = '', title = '', aoa = null, logTxt = '';
+  if(mode==='freq'){
+    const f = waFrequencies(units, o);
+    if(!f.rows.length){ out.innerHTML = '<p class="empty">No quedaron palabras con estas opciones.</p>'; return; }
+    title = `Palabras más frecuentes: ${srcName}`;
+    html = `<p class="hint">${units.length} textos, ${f.total.toLocaleString('es-AR')} ${o.bigrams ? 'pares' : 'palabras'} contadas (${esc(optTxt)}).</p><div class="tablewrap"><table><thead><tr><th>#</th><th>${o.bigrams ? 'Par de palabras' : 'Palabra'}</th><th>Apariciones</th><th>Cada 1.000</th><th>Textos en que aparece</th></tr></thead><tbody>${f.rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.w)}</td><td>${r.n}</td><td>${fmtN(r.per1000,1)}</td><td>${r.docs} (${fmtN(100*r.docs/units.length,0)}%)</td></tr>`).join('')}</tbody></table></div>`;
+    aoa = [['Palabra', 'Apariciones', 'Cada 1.000', 'Textos', '% de textos']].concat(f.rows.map(r=>[r.w, r.n, round2(r.per1000), r.docs, round2(100*r.docs/units.length)]));
+    logTxt = `Frecuencias de palabras en ${srcName} (${units.length} textos; ${optTxt}).`;
+  } else if(mode==='kwic'){
+    const term = document.getElementById('wa-term').value.trim();
+    if(!term){ out.innerHTML = '<p class="empty">Escribí una palabra para ver sus contextos (podés terminarla con * para incluir variantes: "pesc*").</p>'; return; }
+    const k = waKwic(units, term);
+    title = `"${term}" en contexto: ${srcName}`;
+    html = `<p class="hint">${k.total} apariciones en ${units.length} textos${k.total>k.rows.length ? ` (se muestran las primeras ${k.rows.length})` : ''}.</p>` + (k.rows.length ? `<div class="tablewrap"><table class="kwic"><thead><tr><th style="text-align:right">Antes</th><th>Palabra</th><th>Después</th><th>Fuente</th></tr></thead><tbody>${k.rows.map(r=>`<tr><td style="text-align:right;color:var(--sub)">…${esc(r.left)}</td><td><strong>${esc(r.hit)}</strong></td><td style="color:var(--sub)">${esc(r.right)}…</td><td style="font-size:.75rem">${esc(r.ref)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="empty">No aparece en esta fuente.</p>');
+    aoa = [['Antes', 'Palabra', 'Después', 'Fuente']].concat(k.rows.map(r=>[r.left, r.hit, r.right, r.ref]));
+    logTxt = `Búsqueda de "${term}" en contexto en ${srcName}: ${k.total} apariciones.`;
+  } else {
+    const gk = document.getElementById('wa-group').value, gname = document.getElementById('wa-group').selectedOptions[0].textContent;
+    const res = waKeyness(units, o, gk).filter(r=>r.words.length);
+    title = `Palabras características por ${gname.toLowerCase()}: ${srcName}`;
+    if(!res.length){ out.innerHTML = '<p class="empty">Ningún grupo tiene palabras características con estas opciones (hacen falta palabras que aparezcan al menos 3 veces).</p>'; return; }
+    html = `<p class="hint">Para cada grupo, las palabras que aparecen proporcionalmente más que en el resto de los textos, ordenadas por log-verosimilitud (G²). Con G² mayor que 3,84 la diferencia es significativa (p &lt; 0,05); mayor que 10,83, p &lt; 0,001. ${glLink('keyness','¿Qué son las palabras características?')}</p>`
+      + res.map(r=>`<p style="margin:12px 0 4px"><strong>${esc(r.g)}</strong> <span class="hint">(${r.units} textos, ${r.tokens.toLocaleString('es-AR')} palabras)</span></p><div class="tablewrap"><table><thead><tr><th>Palabra</th><th>En el grupo</th><th>Cada 1.000 en el grupo</th><th>Cada 1.000 en el resto</th><th>G²</th></tr></thead><tbody>${r.words.map(w=>`<tr><td>${esc(w.w)}</td><td>${w.a}</td><td>${fmtN(w.inGroup,1)}</td><td>${fmtN(w.inRest,1)}</td><td>${fmtN(w.G2,1)}${w.p<0.05 ? ' <strong>*</strong>' : ''}</td></tr>`).join('')}</tbody></table></div>`).join('');
+    aoa = [['Grupo', 'Palabra', 'En el grupo', 'Cada 1.000 en el grupo', 'Cada 1.000 en el resto', 'G²', 'p']].concat(res.flatMap(r=>r.words.map(w=>[r.g, w.w, w.a, round2(w.inGroup), round2(w.inRest), round2(w.G2), w.p])));
+    logTxt = `Palabras características por ${gname.toLowerCase()} en ${srcName} (log-verosimilitud frente al resto; ${optTxt}).`;
+  }
+  out.innerHTML = html + `<div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="mini-export" id="wa-report">📌 Agregar al informe</button><button type="button" class="mini-export" id="wa-xlsx">⭳ Excel</button></div>`;
+  logEvent('texto', logTxt);
+  document.getElementById('wa-report').onclick = ()=>addToReport({type:'table', title, html, citation: `${logTxt} Calculado con "${APP_LABEL}" el ${new Date().toLocaleString('es-AR')}.`});
+  document.getElementById('wa-xlsx').onclick = ()=>downloadXLSX(xlsxName('palabras_'+mode), [{name:'Palabras', aoa}], [title, logTxt]);
+}
+/* ===== ANÁLISIS DE PALABRAS (fin) ===== */
+
 /* ===== OCR: texto desde imágenes, fotos y PDF escaneados (inicio) ===== */
 // Motor: Tesseract (incluido en vendor/tesseract, se descarga solo la primera vez que se usa).
 // Todo se procesa en la computadora: las imágenes no se envían a ningún servidor.
@@ -4864,13 +5010,15 @@ function ocrDateFromName(name){
   return null;
 }
 // --- preparación de una zona: escala de grises y ampliación si la zona es angosta ---
-function ocrPrepareZone(src, z, enhance){
+function ocrPrepareZone(src, z, enhance, full){
   const w = Math.max(1, Math.round(z.w)), h = Math.max(1, Math.round(z.h));
-  const k = enhance ? Math.min(4, Math.max(1, 600/w)) : 1;   // zonas angostas (columnas de una captura): se amplían
+  // imagen completa: solo se amplía si es chica (capturas), porque cualquier otro retoque empeora la detección de columnas;
+  // zonas angostas (una columna): se llevan a 600 px y se pasan a escala de grises
+  const k = !enhance ? 1 : full ? (w < 1400 ? Math.min(4, 2000/w) : 1) : Math.min(4, Math.max(1, 600/w));
   const c = document.createElement('canvas'); c.width = Math.round(w*k); c.height = Math.round(h*k);
   const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(src, z.x, z.y, w, h, 0, 0, c.width, c.height);
-  if(enhance){
+  if(enhance && !full){
     const im = ctx.getImageData(0, 0, c.width, c.height), d = im.data;
     let lo = 255, hi = 0; const hist = new Uint32Array(256);
     for(let i=0;i<d.length;i+=4){ const g = (d[i]*299 + d[i+1]*587 + d[i+2]*114)/1000 | 0; d[i] = d[i+1] = d[i+2] = g; hist[g]++; }
@@ -4879,6 +5027,7 @@ function ocrPrepareZone(src, z, enhance){
     if(hi-lo < 170 && hi>lo){ for(let i=0;i<d.length;i+=4){ const v = Math.max(0, Math.min(255, (d[i]-lo)*255/(hi-lo))); d[i] = d[i+1] = d[i+2] = v; } }
     ctx.putImageData(im, 0, 0);
   }
+  c.__k = k;
   return c;
 }
 // --- lectura de las zonas, limpieza y armado del texto ---
@@ -4892,10 +5041,15 @@ function ocrUsableLine(l, clean){
 async function ocrRecognizeZones(src, zones, opts, onProgress){
   const w = await getOcrWorker();
   const out = []; // por zona: párrafos → palabras {t, c}
+  const blocksSeen = [];
   for(let i=0;i<zones.length;i++){
     ocrLogger = m=>{ if(m.status==='recognizing text' && onProgress) onProgress(i, zones.length, m.progress); };
-    const canvas = ocrPrepareZone(src, zones[i], opts.enhance);
+    const full = !!opts.auto;
+    await w.setParameters({tessedit_pageseg_mode: full ? '3' : '6'}); // 3: análisis automático de la página (columnas); 6: un solo bloque
+    const canvas = ocrPrepareZone(src, zones[i], opts.enhance, full);
     const { data } = await w.recognize(canvas, {}, { blocks: true, text: true });
+    const kk = canvas.__k || 1;
+    (data.blocks||[]).forEach(b=>{ const usable = b.paragraphs.some(p=>p.lines.some(l=>ocrUsableLine(l, true))); if(usable) blocksSeen.push({x: zones[i].x + b.bbox.x0/kk, y: zones[i].y + b.bbox.y0/kk, w: (b.bbox.x1-b.bbox.x0)/kk, h: (b.bbox.y1-b.bbox.y0)/kk}); });
     const paras = [];
     (data.blocks||[]).forEach(b=>b.paragraphs.forEach(p=>{
       const lines = p.lines.filter(l=>ocrUsableLine(l, opts.clean)).map(l=>l.words.map(wd=>({t: wd.text, c: wd.confidence})));
@@ -4904,6 +5058,7 @@ async function ocrRecognizeZones(src, zones, opts, onProgress){
     out.push({paras, conf: data.confidence});
   }
   ocrLogger = null;
+  out.blocks = blocksSeen;
   return out;
 }
 // Une renglones y zonas: palabra cortada con guion al final del renglón → se une; párrafos de Tesseract → separados
@@ -4966,8 +5121,13 @@ function ocrClassifyLabels(en){
 }
 
 // --- espacio de trabajo ---
-function openOcrFiles(files){ [...files].forEach(f=>ocrQueue.push(f)); if(!ocrOpen) ocrNext(); }
-function ocrNext(){ ocrOpen = false; const f = ocrQueue.shift(); if(f){ ocrOpen = true; openOcrWorkspace(f); } }
+let ocrBatch = null; // lote de imágenes: posición y datos que se repiten de una imagen a la siguiente
+function openOcrFiles(files){
+  const arr = [...files];
+  if(arr.length>1 || ocrQueue.length || ocrOpen){ if(!ocrBatch) ocrBatch = {n: ocrOpen ? 1 : 0, total: ocrOpen ? 1 : 0, medio:'', labels:'', docKey:null}; ocrBatch.total += arr.length; }
+  arr.forEach(f=>ocrQueue.push(f)); if(!ocrOpen) ocrNext();
+}
+function ocrNext(){ ocrOpen = false; const f = ocrQueue.shift(); if(f){ ocrOpen = true; if(ocrBatch) ocrBatch.n++; openOcrWorkspace(f); } else ocrBatch = null; }
 async function openOcrWorkspace(file){
   if(!ocrAvailable()){
     showModal('Texto desde imágenes (OCR)', `<p>El reconocimiento de texto necesita usar Telar desde su dirección web o instalada como aplicación. Abriendo <code>index.html</code> con doble clic, el navegador no permite cargar el motor de OCR.</p><p class="hint">El resto de la app funciona igual desde la carpeta.</p>`);
@@ -4980,13 +5140,13 @@ async function openOcrWorkspace(file){
   const st = {file, page: 1, pages: src.pages, canvas: src.canvas, zones: [], paras: null, conf: 0};
   const sug = ocrDateFromName(file.name);
   const docOpts = Object.entries(qualDocs).map(([k,d])=>`<option value="${esc(k)}" ${d.label==='Recortes (OCR)'?'selected':''}>${esc(d.label)}</option>`).join('');
-  showModal('Texto desde imagen (OCR) — '+file.name, `
+  showModal('Texto desde imagen (OCR) — '+file.name+(ocrBatch && ocrBatch.total>1 ? ` (imagen ${ocrBatch.n} de ${ocrBatch.total})` : ''), `
     <div class="ocr-grid">
       <div>
-        <p class="hint" style="margin:0 0 6px">La imagen se lee completa automáticamente. Si el texto tiene <strong>varias columnas</strong> y salieron mezcladas, marcá con el mouse cada columna <strong>en el orden de lectura</strong> (sin fotos ni avisos) y tocá "Leer de nuevo".</p>
+        <p class="hint" style="margin:0 0 6px">La imagen se lee completa automáticamente: Telar detecta las columnas y las numera en el orden en que las leyó. Si alguna parte salió desordenada, marcá con el mouse las zonas <strong>en el orden de lectura</strong> y tocá "Leer de nuevo".</p>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;align-items:center">
           ${src.pages>1 ? `<label class="hint" style="margin:0">Página <select id="ocr-page">${Array.from({length:src.pages},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join('')}</select> de ${src.pages}</label>` : ''}
-          <button type="button" class="mini-export" id="ocr-all">Toda la imagen</button>
+          <button type="button" class="mini-export" id="ocr-all" title="Leer la imagen completa: Telar detecta las columnas">Lectura automática</button>
           <button type="button" class="mini-export" id="ocr-undo">Deshacer zona</button>
           <button type="button" class="mini-export" id="ocr-clear">Borrar zonas</button>
           <span style="margin-left:auto;display:inline-flex;gap:4px;align-items:center"><span class="hint" style="margin:0">Zoom</span><button type="button" class="mini-export" id="ocr-zout" title="Alejar">−</button><button type="button" class="mini-export" id="ocr-zin" title="Acercar">+</button><button type="button" class="mini-export" id="ocr-zfit" title="Ver la imagen entera">Ajustar</button></span>
@@ -5019,6 +5179,11 @@ async function openOcrWorkspace(file){
         <p class="hint" id="ocr-msg" style="margin-top:6px"></p>
       </div>
     </div>`, {wide:true, onClose: ()=>{ setTimeout(ocrNext, 50); }});
+  if(ocrBatch){ // datos de la imagen anterior del lote
+    if(ocrBatch.medio) document.getElementById('ocr-medio').value = ocrBatch.medio;
+    if(ocrBatch.labels) document.getElementById('ocr-labels').value = ocrBatch.labels;
+    if(ocrBatch.docKey && qualDocs[ocrBatch.docKey]) document.getElementById('ocr-doc').value = ocrBatch.docKey;
+  }
   document.querySelectorAll('.ocr-topic').forEach(b=>b.onclick = ()=>{ const inp = document.getElementById('ocr-labels'); const cur = inp.value.split(',').map(x=>x.trim()).filter(Boolean); if(!cur.some(x=>normColName(x)===normColName(b.dataset.t))) cur.push(b.dataset.t); inp.value = cur.join(', '); });
   const cv = document.getElementById('ocr-canvas'), ov = document.getElementById('ocr-overlay');
   const draw = ()=>{
@@ -5029,7 +5194,8 @@ async function openOcrWorkspace(file){
     const sw = 2.5*k, fs = 22*k;
     const pr = document.getElementById('ocr-progress');
     if(pr && !pr.dataset.busy && st.read) pr.textContent = st.zones.length ? `${st.zones.length} zona${st.zones.length>1?'s':''} marcada${st.zones.length>1?'s':''}. Tocá "Leer de nuevo".` : 'Sin zonas marcadas: se lee la imagen completa.';
-    ov.innerHTML = st.zones.map((z,i)=>`<rect x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" fill="rgba(47,107,110,.12)" stroke="#B5533C" stroke-width="${sw}"/><circle cx="${z.x+fs*0.7}" cy="${z.y+fs*0.7}" r="${fs*0.6}" fill="#B5533C"/><text x="${z.x+fs*0.7}" y="${z.y+fs*0.7}" fill="#fff" font-size="${fs*0.75}" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-weight="700">${i+1}</text>`).join('');
+    const det = (st.detected||[]).map((z,i)=>`<rect class="ocr-det" x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" fill="rgba(47,107,110,.06)" stroke="#2F6B6E" stroke-dasharray="${4*k} ${3*k}" stroke-width="${1.5*k}"/><text x="${z.x+4*k}" y="${z.y+13*k}" fill="#2F6B6E" font-size="${12*k}" font-family="sans-serif" font-weight="700">${i+1}</text>`).join('');
+    ov.innerHTML = det + st.zones.map((z,i)=>`<rect class="ocr-zone" x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" fill="rgba(47,107,110,.12)" stroke="#B5533C" stroke-width="${sw}"/><circle cx="${z.x+fs*0.7}" cy="${z.y+fs*0.7}" r="${fs*0.6}" fill="#B5533C"/><text x="${z.x+fs*0.7}" y="${z.y+fs*0.7}" fill="#fff" font-size="${fs*0.75}" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-weight="700">${i+1}</text>`).join('');
   };
   draw();
   // dibujar zonas con el mouse o el dedo
@@ -5041,7 +5207,7 @@ async function openOcrWorkspace(file){
     if(!start) return; const p = toImg(e);
     const z = {x: Math.max(0, Math.min(p.x,start.x)), y: Math.max(0, Math.min(p.y,start.y))};
     z.w = Math.min(st.canvas.width, Math.max(p.x,start.x)) - z.x; z.h = Math.min(st.canvas.height, Math.max(p.y,start.y)) - z.y;
-    start = null; if(z.w > 15 && z.h > 15) st.zones.push(z); draw();
+    start = null; if(z.w > 15 && z.h > 15){ st.zones.push(z); st.detected = []; } draw();
   });
   // zoom: la imagen se amplía dentro del recuadro (con barras de desplazamiento) para marcar las columnas con precisión
   let zoom = 1; const zw = document.getElementById('ocr-zoomwrap'), stage = document.getElementById('ocr-stage');
@@ -5049,9 +5215,9 @@ async function openOcrWorkspace(file){
   document.getElementById('ocr-zin').onclick = ()=>setZoom(zoom*1.5);
   document.getElementById('ocr-zout').onclick = ()=>setZoom(zoom/1.5);
   document.getElementById('ocr-zfit').onclick = ()=>setZoom(1);
-  document.getElementById('ocr-all').onclick = ()=>{ st.zones = [{x:0, y:0, w: st.canvas.width, h: st.canvas.height}]; draw(); };
+  document.getElementById('ocr-all').onclick = ()=>{ st.zones = []; st.detected = []; draw(); document.getElementById('ocr-run').click(); };
   document.getElementById('ocr-undo').onclick = ()=>{ st.zones.pop(); draw(); };
-  document.getElementById('ocr-clear').onclick = ()=>{ st.zones = []; draw(); };
+  document.getElementById('ocr-clear').onclick = ()=>{ st.zones = []; st.detected = []; draw(); };
   const pageSel = document.getElementById('ocr-page');
   if(pageSel) pageSel.onchange = async ()=>{ showBusy('Abriendo la página '+pageSel.value+'…'); await nextPaint(); try{ const r = await ocrImageFromFile(file, +pageSel.value); st.canvas = r.canvas; st.page = +pageSel.value; st.zones = []; draw(); } finally { hideBusy(); } };
   const prog = document.getElementById('ocr-progress'), txtEl = document.getElementById('ocr-text');
@@ -5061,14 +5227,14 @@ async function openOcrWorkspace(file){
     prog.textContent = ocrWorkerPromise ? 'Leyendo…' : 'Preparando el motor de OCR (la primera vez tarda un poco más)…';
     try{
       const zones = st.zones.length ? st.zones : [{x:0, y:0, w: st.canvas.width, h: st.canvas.height}];
-      const res = await ocrRecognizeZones(st.canvas, zones, {enhance: document.getElementById('ocr-enh').checked, clean: document.getElementById('ocr-clean').checked},
+      const res = await ocrRecognizeZones(st.canvas, zones, {auto: !st.zones.length, enhance: document.getElementById('ocr-enh').checked, clean: document.getElementById('ocr-clean').checked},
         (i, n, p)=>{ prog.textContent = `Leyendo zona ${i+1} de ${n}… ${Math.round(p*100)}%`; });
-      st.paras = ocrAssemble(res);
+      st.paras = ocrAssemble(res); st.detected = st.zones.length ? [] : (res.blocks || []); draw();
       const words = st.paras.flat(); st.conf = words.length ? words.reduce((s,w)=>s+w.c,0)/words.length : 0;
       const low = words.filter(w=>w.c<70).length;
       txtEl.innerHTML = st.paras.length ? ocrParasToHtml(st.paras) : '<p class="hint">No se reconoció texto en las zonas marcadas.</p>';
       st.read = true;
-      prog.textContent = `Listo: ${words.length} palabras, confianza media ${Math.round(st.conf)}%${low ? `, ${low} dudosas (subrayadas)` : ''}.` + (st.zones.length ? '' : ' Si se mezclaron columnas, marcalas en orden y tocá "Leer de nuevo".');
+      prog.textContent = `Listo: ${words.length} palabras, confianza media ${Math.round(st.conf)}%${low ? `, ${low} dudosas (subrayadas)` : ''}.` + (st.zones.length ? '' : ' Los recuadros numerados muestran el orden de lectura. Borrá en el texto lo que no corresponda a la nota.');
       setDone(st.paras.length>0);
     }catch(err){ prog.textContent = 'No se pudo leer: '+err.message; }
     finally{ btn.disabled = false; delete prog.dataset.busy; }
@@ -5085,6 +5251,7 @@ async function openOcrWorkspace(file){
     const texto = plain(); if(!texto){ msg.textContent = 'No hay texto para guardar.'; return; }
     const r = ocrSaveAsRelato({texto, d:+dm[1], m:+dm[2], y, labels: document.getElementById('ocr-labels').value.split(','), medio: document.getElementById('ocr-medio').value.trim(),
       docKey: document.getElementById('ocr-doc').value || null, archivo: file.name + (st.pages>1 ? ` (página ${st.page})` : ''), conf: st.conf, imagen: document.getElementById('ocr-keepimg').checked ? ocrThumbnail(st.canvas) : null});
+    if(ocrBatch) Object.assign(ocrBatch, {medio: document.getElementById('ocr-medio').value.trim(), labels: document.getElementById('ocr-labels').value, docKey: r.key});
     closeModal(false);
     renderQualUI(); updateMainTabCounts(); updateUploadToggle(); persistSession();
     showMainPanel('texto');
@@ -5656,6 +5823,7 @@ function collapseAtStartup(){
 /* --- Solapas principales: Gráficos / Texto / Bibliografía --- */
 const MAIN_PANELS = ['graficos','texto','entrevistas','codigos','biblio','espec'];
 function showMainPanel(id, opts={}){
+  if(id==='codigos') setTimeout(renderWordsUI, 0);
   if(!MAIN_PANELS.includes(id)) id = 'graficos';
   MAIN_PANELS.forEach(p=>{
     const on = p===id;
@@ -5691,6 +5859,7 @@ document.querySelectorAll('.main-tab').forEach(t=>{
   });
 });
 function updateMainTabCounts(){
+  try{ renderWordsUI(); }catch(e){}
   const nQ = Object.keys(qualDocs).length, nI = Object.keys(interviews).length, nM = Object.values(datasets).filter(isCodingMatrix).length;
   document.getElementById('tab-count-entrevistas').textContent = nI ? '('+nI+')' : '';
   document.getElementById('tab-count-codigos').textContent = nM ? '('+nM+')' : '';
@@ -7588,6 +7757,7 @@ function setupHelp(){
   });
 }
 const GLOSSARY = [
+  ['keyness','Palabras características (log-verosimilitud)','Las palabras que un grupo de textos usa proporcionalmente más que el resto (por ejemplo, las que distinguen a un tópico o a una entrevista). Se miden con la log-verosimilitud (G²), que compara la frecuencia en el grupo con la del resto: con G² mayor que 3,84 la diferencia es significativa (p < 0,05). Muestran de qué se habla en cada grupo, pero no reemplazan la lectura de los textos.'],
   ['rangos','Pruebas de rangos (no paramétricas)','Comparan grupos según la posición (el rango) de cada valor, en lugar del promedio: Mann-Whitney para dos grupos y Kruskal-Wallis para tres o más. No suponen que los datos sigan una distribución normal, por eso convienen con pocos casos, con valores extremos o con escalas ordinales. Informan medianas y rangos medios.'],
   ['pares','Comparaciones de a pares y ajuste de p','Cuando hay tres o más grupos, la prueba general dice si hay alguna diferencia, pero no cuál. Las comparaciones de a pares revisan cada par. Como hacer muchas pruebas aumenta la chance de encontrar diferencias por azar, los p se ajustan: Tukey (supone variabilidades iguales), Games-Howell (no lo supone), Holm o Bonferroni (más conservador). Con pruebas de rangos se usa la prueba de Dunn.'],
   ['supuestos','Supuestos de una prueba','Condiciones bajo las que una prueba funciona bien. La comparación de promedios supone datos aproximadamente normales en cada grupo (se revisa con Shapiro-Wilk) y, en su versión clásica, variabilidades iguales (se revisa con Levene). Con 30 casos o más por grupo, la normalidad importa poco; si no se cumple con grupos chicos, conviene la prueba de rangos.'],
