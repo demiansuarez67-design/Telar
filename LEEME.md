@@ -1,4 +1,4 @@
-# Telar · Asistente de investigación — versión 0.12.0 (beta)
+# Telar · Asistente de investigación — versión 0.13.0 (beta)
 
 Telar integra el análisis de bases de datos y encuestas, relatos fechados, entrevistas y codificación cualitativa en una sola herramienta. Funciona entera en el navegador: **los archivos de cada persona se procesan en su computadora y no se envían a ningún servidor.**
 
@@ -10,6 +10,7 @@ Telar integra el análisis de bases de datos y encuestas, relatos fechados, entr
 | `manifest.webmanifest`, `sw.js`, `icons/` | Lo que permite instalarla y usarla sin conexión |
 | `vendor/` | Librerías incluidas (Excel, gráficos, Word, PDF), para no depender de internet |
 | `fonts/` | Tipografías incluidas (no se consulta a Google Fonts) |
+| `vendor/leaflet/`, `vendor/mapa/` | Mapa interactivo (Leaflet) y cartografía incluida (Natural Earth), que funcionan sin conexión |
 | `vendor/tesseract/` | Motor de OCR (texto desde imágenes) y datos del idioma español. Se descarga solo la primera vez que se usa |
 | `sample-project.js` | El proyecto de ejemplo, con datos ficticios |
 | `LICENCIAS-DE-TERCEROS.txt` | Licencias de las librerías y tipografías incluidas |
@@ -97,7 +98,7 @@ Quienes ya tengan la app abierta o instalada ven el aviso **"Hay una versión nu
 
 ## Cómo citarla
 
-Telar · Asistente de investigación, versión 0.12.0 (beta). La versión figura también en cada informe, anexo metodológico y archivo exportado.
+Telar · Asistente de investigación, versión 0.13.0 (beta). La versión figura también en cada informe, anexo metodológico y archivo exportado.
 
 ## Licencias
 

@@ -1,10 +1,13 @@
 // Telar: funcionamiento sin conexión.
 // Al publicar una versión nueva, cambiar VERSION (y APP_VERSION en index.html): la app avisa que hay una actualización.
-const VERSION = '0.12.0';
+const VERSION = '0.13.0';
 const CACHE = 'telar-' + VERSION;
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './sample-project.js',
-  './vendor/xlsx.full.min.js', './vendor/chart.umd.min.js', './vendor/mammoth.browser.min.js',
+  './vendor/xlsx.full.min.js', './vendor/chart.umd.min.js',
+  './vendor/leaflet/leaflet.js',
+  './vendor/leaflet/leaflet.css',
+  './vendor/mapa/base.js', './vendor/mammoth.browser.min.js',
   './vendor/pdfjs/pdf.min.js', './vendor/pdfjs/pdf.worker.min.js',
   './fonts/ibm-plex-sans-latin-400-normal.woff2', './fonts/ibm-plex-sans-latin-500-normal.woff2', './fonts/ibm-plex-sans-latin-600-normal.woff2',
   './fonts/source-serif-4-latin-400-normal.woff2', './fonts/source-serif-4-latin-600-normal.woff2',

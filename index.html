@@ -45,6 +45,7 @@
 .ocr-stage svg{position:absolute;inset:0;width:100%;height:100%;cursor:crosshair}
 .ocr-text{border:1px solid var(--line);border-radius:4px;padding:8px 12px;min-height:220px;max-height:46vh;overflow:auto;background:var(--panel);font-size:.9rem;line-height:1.6}
 .ocr-text p{margin:0 0 8px}
+.map-label{background:rgba(255,255,255,.9);border:1px solid #C7D0CD;font-size:11px;padding:1px 5px;box-shadow:none}
 .ocr-low{background:rgba(232,190,60,.35);border-bottom:2px solid #C9A227}
 .help-btn{border:1px solid var(--line);background:var(--panel);color:var(--teal-d);width:22px;height:22px;border-radius:50%;font:600 .78rem/1 inherit;cursor:pointer;padding:0;margin-left:8px;flex:none}
 .help-btn[aria-expanded="true"]{background:var(--teal-d);color:#fff;border-color:var(--teal-d)}
@@ -234,6 +235,8 @@ tbody tr:hover{background:var(--accent-bg)}
       <button class="mode-btn" data-mode="timeline">Línea de tiempo</button>
       <button class="mode-btn" data-mode="cmp">Comparar grupos</button>
       <button class="mode-btn" data-mode="reg">Regresión</button>
+      <button class="mode-btn" data-mode="conf">Conflictividad</button>
+      <button class="mode-btn" data-mode="net">Red de actores</button>
       </div>
       <div class="modebar-opts">
       <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;color:var(--sub);cursor:pointer">
@@ -339,6 +342,25 @@ tbody tr:hover{background:var(--accent-bg)}
       </div>
       <div class="field" style="max-width:100%;margin-bottom:10px"><label>Variables explicativas</label><div id="reg-xs" style="display:flex;flex-wrap:wrap;gap:4px 14px"></div></div>
       <div id="reg-out"></div>
+    </div>
+
+    <div id="conf-view" style="display:none">
+      <p class="hint helptext">Indicadores de conflictividad de la base: cantidad de conflictos por período, picos y ciclos de protesta, actores activos y cambios en el repertorio (las formas de protesta). Usa los filtros activos.</p>
+      <div class="adv-controls">
+        <div class="field"><label>Período</label><select id="conf-gran"></select></div>
+        <div class="field"><label>Actores (opcional)</label><select id="conf-actor"></select></div>
+        <div class="field"><label>Repertorio: formas de protesta (opcional)</label><select id="conf-form"></select></div>
+      </div>
+      <div id="conf-out"></div>
+    </div>
+
+    <div id="net-view" style="display:none">
+      <p class="hint helptext">Muestra qué actores aparecen juntos en los mismos registros (por ejemplo, varias organizaciones en un mismo conflicto) o en los mismos relatos (palabras clave). Cada punto es un actor y cada línea, una co-aparición. La tabla informa sus medidas de centralidad.</p>
+      <div class="adv-controls">
+        <div class="field" style="flex:1"><label>Actores de</label><select id="net-src"></select></div>
+        <div class="field"><label>Vínculos con al menos</label><select id="net-min"><option value="1">1 co-aparición</option><option value="2">2 co-apariciones</option><option value="3">3 co-apariciones</option><option value="5">5 co-apariciones</option></select></div>
+      </div>
+      <div id="net-out"></div>
     </div>
 
     <h2 id="records-toggle" style="margin-top:26px;font-size:1rem;cursor:pointer;display:flex;align-items:center;gap:8px;user-select:none">
@@ -513,6 +535,17 @@ tbody tr:hover{background:var(--accent-bg)}
     </div>
     <div id="wa-out"></div>
   </section>
+  <section class="card" id="mind-section" style="display:none">
+    <h2>Mapa mental</h2>
+    <p class="hint">Un diagrama con el tema en el centro y sus ramas alrededor, armado a partir de los archivos del proyecto: el sistema de códigos, los tópicos de los relatos con sus actores, una palabra con las que la acompañan en los textos, o dos columnas de una base de datos.</p>
+    <div class="adv-controls">
+      <div class="field"><label>A partir de</label><select id="mm-src"></select></div>
+      <div class="field" id="mm-term-wrap" style="display:none"><label>Palabra (con * para variantes)</label><input type="text" id="mm-term" placeholder="ej. despid*"></div>
+      <div id="mm-cols-wrap" style="display:none;gap:10px" class="adv-controls"><div class="field"><label>Ramas: categorías de</label><select id="mm-colA"></select></div><div class="field"><label>Hojas: valores de</label><select id="mm-colB"></select></div></div>
+      <button class="go" id="mm-run" style="align-self:flex-end">Armar el mapa</button>
+    </div>
+    <div id="mm-out"></div>
+  </section>
   </div>
 
   <div class="main-panel" id="panel-biblio" role="tabpanel" aria-labelledby="tab-biblio" hidden>
@@ -586,7 +619,7 @@ tbody tr:hover{background:var(--accent-bg)}
 
 <script>
 // ===== Versión de Telar (al publicar una nueva, cambiar acá y en sw.js) =====
-const APP_VERSION = '0.12.0';
+const APP_VERSION = '0.13.0';
 const APP_CHANNEL = 'beta';
 const APP_LABEL = 'Telar ' + APP_VERSION + ' ' + APP_CHANNEL;
 // Dirección del formulario de comentarios (ej. un Formulario de Google). Vacía: se explica cómo configurarla.
@@ -836,6 +869,11 @@ let showTrend = false;
 document.getElementById('cross-xlsx-btn').addEventListener('click', exportCrossXLSX);
 document.getElementById('cmp-run').addEventListener('click', runCompare);
 document.getElementById('wa-run').addEventListener('click', runWords);
+document.getElementById('mm-run').addEventListener('click', ()=>runMind(false));
+document.getElementById('mm-src').addEventListener('change', setupMindControls);
+document.getElementById('mm-term').addEventListener('keydown', e=>{ if(e.key==='Enter') runMind(false); });
+['net-src','net-min'].forEach(id=>document.getElementById(id).addEventListener('change', renderNet));
+['conf-gran','conf-actor','conf-form'].forEach(id=>document.getElementById(id).addEventListener('change', renderConf));
 ['wa-mode','wa-source'].forEach(id=>document.getElementById(id).addEventListener('change', waControls));
 document.getElementById('wa-term').addEventListener('keydown', e=>{ if(e.key==='Enter') runWords(); });
 ['cmp-design','cmp-y','cmp-method'].forEach(id=>document.getElementById(id).addEventListener('change', updateCmpControls));
@@ -1427,6 +1465,12 @@ function detectColumn(ds, c){
   if(/^(documento|documentos|document|document name|nombre del documento|doc|entrevista|entrevistas|archivo)$/.test(name))
     return {role:'documento', multi:false, why:'nombre de columna de documento'};
   const avgLen = strs.reduce((s,v)=>s+v.length,0)/n;
+  if(avgLen<=60 && distinct>50 && distinct/n>0.6){
+    // muchas combinaciones distintas, pero de una lista corta de valores ("STIA, SUPA", "SUPA, Municipio"…): categoría con varios valores por celda
+    const parts = strs.map(v=>splitRaw(v)), partSet = new Set(parts.flat().map(p=>p.toLowerCase()));
+    const withSep = parts.filter(p=>p.length>1).length, avgPart = parts.flat().reduce((s,p)=>s+p.length,0)/Math.max(1, parts.flat().length);
+    if(partSet.size <= Math.max(40, n*0.15) && withSep >= 0.3*n && avgPart <= 35) return {role:'categoria', multi:true, why:'varios valores por celda, de una lista de '+partSet.size+' valores'};
+  }
   if(avgLen>60 || (distinct>50 && distinct/n>0.6)) return {role:'texto', multi:false, why: avgLen>60 ? 'textos largos' : 'casi todos los valores son distintos'};
   const isPlace = /(localidad|lugar|ciudad|provincia|departamento|partido|municipio|puerto|region|pais|barrio|zona|pueblo|comuna|distrito|paraje|ubicacion)/.test(name);
   // ¿varios valores por celda? Solo si las partes aparecen también como valores sueltos en otras celdas
@@ -3267,6 +3311,7 @@ function buildAnnexHtml(){
   h += '<li>Valores con varias partes: la coma, la barra y el guion con espacios separan siempre; la conjunción "y" separa solo si todas las partes aparecen como valores sueltos en otras celdas de la misma columna.</li>';
   { const der = Object.values(datasets).flatMap(d=>(d.derived||[]).map(x=>Object.assign({base: d.label}, x)));
     if(der.length) h += `<li>Índices construidos: ${der.map(x=>`«${esc(x.name)}» en «${esc(x.base)}» (${x.method==='mean' ? 'promedio' : 'suma'} de ${esc(x.items.join(', '))}; alfa de Cronbach = ${fmtN(x.alpha,3)}, ${x.n} casos con todas las preguntas respondidas)`).join('; ')}. Los casos con alguna pregunta sin responder quedan sin valor en el índice.</li>`; }
+  if(methodLog.some(e=>/Indicadores de conflictividad/.test(e.text || e.msg || ''))) h += `<li>Indicadores de conflictividad: un pico es un período con más conflictos que el promedio más 1,5 desvíos estándar; un ciclo de protesta, un tramo de dos o más períodos seguidos por encima de la mediana; la diversidad del repertorio se mide con la equidad de Pielou (entropía de Shannon de las formas de protesta del período, dividida por su máximo posible). Los períodos sin registros se cuentan con cero.</li>`;
   if(methodLog.some(e=>e.kind==='texto')) h += `<li>Análisis de palabras: el texto se divide en palabras (secuencias de letras, en minúsculas, sin lematizar), excluyendo las palabras vacías del español según una lista fija de ${STOP_ES.size} palabras cuando se indica. Las palabras características de cada grupo se identifican por log-verosimilitud (G², Rayson y Garside, 2000), comparando su frecuencia en el grupo con la del resto de los textos; se listan las que aparecen al menos 3 veces y proporcionalmente más en el grupo.</li>`;
   { const nOcr = Object.values(qualDocs).reduce((s,d)=>s+d.entries.filter(e=>e.ocr).length, 0);
     if(nOcr) h += `<li>Transcripción por OCR: ${nOcr} relato(s) se obtuvieron de imágenes (fotos, capturas o PDF escaneados) con ${OCR_ENGINE}, procesando por separado las zonas de texto marcadas en orden de lectura y descartando los renglones de baja confianza; el texto se revisó y corrigió manualmente antes de guardarlo. Cada relato conserva la referencia a su imagen de origen.</li>`; }
@@ -4956,6 +5001,291 @@ function runWords(){
 }
 /* ===== ANÁLISIS DE PALABRAS (fin) ===== */
 
+/* ===== REDES Y MAPAS MENTALES: visor común (inicio) ===== */
+// SVG a imagen PNG (para el informe y la descarga)
+function svgToPngDataURL(svg, scale=2){
+  return new Promise((res, rej)=>{
+    const xml = new XMLSerializer().serializeToString(svg), vb = svg.viewBox.baseVal;
+    const img = new Image(); img.onload = ()=>{ const c = document.createElement('canvas'); c.width = vb.width*scale; c.height = vb.height*scale; const ctx = c.getContext('2d'); ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,c.width,c.height); ctx.drawImage(img, 0, 0, c.width, c.height); res(c.toDataURL('image/png')); };
+    img.onerror = ()=>rej(new Error('no se pudo convertir la imagen'));
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+  });
+}
+function svgDownload(svg, name){ universalDownload(name+'.svg', new Blob([new XMLSerializer().serializeToString(svg)], {type:'image/svg+xml'})); }
+const GRAPH_COLORS = ['#2F6B6E','#B5533C','#5E8C61','#8A6A9C','#C28E2B','#3D7EA6','#A2574F','#6B7F3A','#7A5C3E','#4F6D8A'];
+/* ===== REDES DE ACTORES (inicio) ===== */
+// Unidades: cada conflicto (fila de la base) o cada relato, con los actores que aparecen en él
+function netUnits(src){
+  if(src==='__kw__') return Object.values(qualDocs).flatMap(d=>d.entries.map(e=>[...new Set((e.keywords||[]).map(k=>String(k).trim()).filter(Boolean))]));
+  const ds = datasets[active]; if(!ds) return [];
+  return getFiltered().map(r=>[...new Set(getCategories(ds, r, src).filter(v=>v && v!=='(sin dato)'))]);
+}
+function netBuild(units, minW){
+  const n = new Map(), pair = new Map();
+  units.forEach(u=>{ u.forEach(a=>n.set(a, (n.get(a)||0)+1)); for(let i=0;i<u.length;i++) for(let j=i+1;j<u.length;j++){ const [a,b] = u[i]<u[j] ? [u[i],u[j]] : [u[j],u[i]]; const k = a+'\u0000'+b; pair.set(k, (pair.get(k)||0)+1); } });
+  const edges = [...pair.entries()].map(([k,w])=>{ const [a,b] = k.split('\u0000'); return {a, b, w}; }).filter(e=>e.w>=minW);
+  const ids = [...new Set(edges.flatMap(e=>[e.a, e.b]))].sort((x,y)=>(n.get(y)-n.get(x)) || x.localeCompare(y));
+  const isolated = [...n.keys()].filter(a=>!ids.includes(a)).length;
+  return {nodes: ids.map(id=>({id, n: n.get(id)})), edges, isolated, units: units.filter(u=>u.length).length};
+}
+// Centralidad: grado (normalizado por n − 1, como NetworkX), grado ponderado e intermediación (Brandes, sin pesos, normalizada)
+function netCentrality(g){
+  const N = g.nodes.length, idx = new Map(g.nodes.map((x,i)=>[x.id, i])), adj = g.nodes.map(()=>[]), wdeg = new Array(N).fill(0);
+  g.edges.forEach(e=>{ const a = idx.get(e.a), b = idx.get(e.b); adj[a].push(b); adj[b].push(a); wdeg[a] += e.w; wdeg[b] += e.w; });
+  const bc = new Array(N).fill(0);
+  for(let s=0;s<N;s++){
+    const S = [], P = adj.map(()=>[]), sigma = new Array(N).fill(0), dist = new Array(N).fill(-1); sigma[s] = 1; dist[s] = 0; const Q = [s];
+    while(Q.length){ const v = Q.shift(); S.push(v); adj[v].forEach(w=>{ if(dist[w]<0){ dist[w] = dist[v]+1; Q.push(w); } if(dist[w]===dist[v]+1){ sigma[w] += sigma[v]; P[w].push(v); } }); }
+    const delta = new Array(N).fill(0);
+    while(S.length){ const w = S.pop(); P[w].forEach(v=>{ delta[v] += sigma[v]/sigma[w]*(1+delta[w]); }); if(w!==s) bc[w] += delta[w]; }
+  }
+  const norm = N>2 ? 2/((N-1)*(N-2)) : 1;
+  return g.nodes.map((x,i)=>({id: x.id, n: x.n, degree: adj[i].length, degc: N>1 ? adj[i].length/(N-1) : 0, wdeg: wdeg[i], btw: bc[i]/2*norm}));
+}
+// Disposición por fuerzas (Fruchterman-Reingold), determinística
+function netLayout(g, W, H){
+  const N = g.nodes.length, pos = g.nodes.map((x,i)=>({x: W/2 + Math.cos(2*Math.PI*i/N)*W*0.35, y: H/2 + Math.sin(2*Math.PI*i/N)*H*0.35}));
+  if(N<2) return pos.map(()=>({x:W/2, y:H/2}));
+  const idx = new Map(g.nodes.map((x,i)=>[x.id, i])), k = Math.sqrt(W*H/N)*0.75; let t = W/8;
+  for(let it=0; it<300; it++){
+    const d = pos.map(()=>({x:0, y:0}));
+    for(let i=0;i<N;i++) for(let j=i+1;j<N;j++){ let dx = pos[i].x-pos[j].x, dy = pos[i].y-pos[j].y, dd = Math.max(0.01, Math.hypot(dx,dy)); const f = k*k/dd; d[i].x += dx/dd*f; d[i].y += dy/dd*f; d[j].x -= dx/dd*f; d[j].y -= dy/dd*f; }
+    g.edges.forEach(e=>{ const i = idx.get(e.a), j = idx.get(e.b); const dx = pos[i].x-pos[j].x, dy = pos[i].y-pos[j].y, dd = Math.max(0.01, Math.hypot(dx,dy)); const f = dd*dd/k*(1+Math.log(e.w)); d[i].x -= dx/dd*f; d[i].y -= dy/dd*f; d[j].x += dx/dd*f; d[j].y += dy/dd*f; });
+    pos.forEach((p,i)=>{ const dd = Math.max(0.01, Math.hypot(d[i].x, d[i].y)); p.x += d[i].x/dd*Math.min(dd, t); p.y += d[i].y/dd*Math.min(dd, t); p.x += (W/2 - p.x)*0.01; p.y += (H/2 - p.y)*0.01; });
+    t *= 0.985;
+  }
+  const xs = pos.map(p=>p.x), ys = pos.map(p=>p.y), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  return pos.map(p=>({x: 70 + (p.x-x0)/Math.max(1,x1-x0)*(W-140), y: 40 + (p.y-y0)/Math.max(1,y1-y0)*(H-80)}));
+}
+function netSvg(g, cen){
+  const W = 760, H = 520, pos = netLayout(g, W, H), idx = new Map(g.nodes.map((x,i)=>[x.id, i]));
+  const maxN = Math.max(...g.nodes.map(x=>x.n)), maxW = Math.max(...g.edges.map(e=>e.w)), btw = new Map(cen.map(c=>[c.id, c.btw])), maxB = Math.max(1e-9, ...cen.map(c=>c.btw));
+  const r = x=>6 + 16*Math.sqrt(x.n/maxN);
+  const edges = g.edges.map(e=>{ const a = pos[idx.get(e.a)], b = pos[idx.get(e.b)]; return `<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="#7A8A8E" stroke-opacity="0.55" stroke-width="${(1 + 5*e.w/maxW).toFixed(1)}"><title>${esc(e.a)} – ${esc(e.b)}: ${e.w}</title></line>`; }).join('');
+  const nodes = g.nodes.map((x,i)=>{ const p = pos[i], hub = btw.get(x.id)/maxB; return `<g><circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${r(x).toFixed(1)}" fill="${hub>0.5 ? '#B5533C' : '#2F6B6E'}" stroke="#fff" stroke-width="1.5"><title>${esc(x.id)}: ${x.n}</title></circle><text x="${p.x.toFixed(1)}" y="${(p.y - r(x) - 4).toFixed(1)}" text-anchor="middle" font-size="11" font-family="IBM Plex Sans, Arial, sans-serif" fill="#16232E" paint-order="stroke" stroke="#fff" stroke-width="3">${esc(x.id.length>28 ? x.id.slice(0,27)+'…' : x.id)}</text></g>`; }).join('');
+  return `<svg id="net-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;background:#fff;border:1px solid var(--line);border-radius:6px" role="img" aria-label="Red de actores">${edges}${nodes}</svg>`;
+}
+function setupNetControls(){
+  const ds = datasets[active], sel = document.getElementById('net-src'); if(!ds || !sel) return;
+  const pv = sel.value, multis = catColumns(ds).filter(c=>isMultiColumn(ds, c));
+  const hasKw = Object.values(qualDocs).some(d=>d.entries.some(e=>(e.keywords||[]).length>1));
+  sel.innerHTML = multis.map(c=>`<option value="${esc(c)}">${esc(c)} (en cada registro de la base)</option>`).join('') + (hasKw ? '<option value="__kw__">Palabras clave de los relatos (en cada relato)</option>' : '');
+  if([...sel.options].some(o=>o.value===pv)) sel.value = pv;
+}
+function renderNet(){
+  setupNetControls();
+  const out = document.getElementById('net-out'), src = document.getElementById('net-src').value;
+  if(!src){ out.innerHTML = '<p class="empty">Para armar una red hace falta una columna con varios actores por registro (por ejemplo, varias organizaciones en un mismo conflicto, separadas por coma) o relatos con varias palabras clave.</p>'; return; }
+  const minW = Math.max(1, +document.getElementById('net-min').value || 1);
+  const g = netBuild(netUnits(src), minW);
+  if(!g.edges.length){ out.innerHTML = `<p class="empty">No hay actores que aparezcan juntos${minW>1 ? ' al menos '+minW+' veces' : ''}.</p>`; return; }
+  if(g.nodes.length>80){ const keep = new Set(g.nodes.slice(0,80).map(x=>x.id)); g.nodes = g.nodes.filter(x=>keep.has(x.id)); g.edges = g.edges.filter(e=>keep.has(e.a) && keep.has(e.b)); g.trimmed = true; }
+  const cen = netCentrality(g).sort((a,b)=>b.btw-a.btw || b.wdeg-a.wdeg);
+  const srcName = src==='__kw__' ? 'palabras clave de los relatos' : `"${src}"`;
+  const top = cen.slice(0,3).map(c=>c.id);
+  out.innerHTML = `<p style="margin:6px 0">Red de actores que aparecen juntos (${srcName}): <strong>${g.nodes.length}</strong> actores, <strong>${g.edges.length}</strong> vínculos, sobre ${g.units} ${src==='__kw__' ? 'relatos' : 'registros'}. El tamaño de cada punto indica en cuántos aparece; el grosor de cada línea, cuántas veces aparecen juntos. En terracota, los actores que más conectan a otros (intermediación alta).${g.isolated ? ` ${g.isolated} actor(es) no aparecen junto a otros y no se muestran.` : ''}${g.trimmed ? ' Se muestran los 80 actores más frecuentes.' : ''}</p>
+    ${netSvg(g, cen)}
+    <p class="hint" style="margin:8px 0">Los actores con mayor intermediación (${top.map(esc).join(', ')}) son los que más conectan a otros que no aparecen juntos entre sí. ${glLink('red','¿Qué miden estas medidas?')}</p>
+    <div class="tablewrap"><table><thead><tr><th>Actor</th><th>Apariciones</th><th>Vínculos (grado)</th><th>Co-apariciones (grado ponderado)</th><th>Intermediación</th></tr></thead><tbody>${cen.map(c=>`<tr><td>${esc(c.id)}</td><td>${c.n}</td><td>${c.degree}</td><td>${c.wdeg}</td><td>${fmtN(c.btw,3)}</td></tr>`).join('')}</tbody></table></div>
+    <div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="mini-export" id="net-report">📌 Agregar al informe</button><button type="button" class="mini-export" id="net-png">⭳ Imagen</button><button type="button" class="mini-export" id="net-xlsx">⭳ Excel</button></div>`;
+  const title = `Red de actores: ${srcName}`, note = `Red de co-aparición de actores en ${src==='__kw__' ? 'los mismos relatos' : 'los mismos registros de "'+datasets[active].label+'"'}${minW>1 ? ' (vínculos de al menos '+minW+' co-apariciones)' : ''}. Intermediación normalizada (Brandes).`;
+  logEvent('modelos', `${title}: ${g.nodes.length} actores y ${g.edges.length} vínculos. ${note}`);
+  const svg = ()=>document.getElementById('net-svg');
+  document.getElementById('net-png').onclick = async ()=>{ const u = await svgToPngDataURL(svg()); const a = document.createElement('a'); a.href = u; a.download = xlsxName('red_actores').replace(/\.xlsx$/,'') + '.png'; a.click(); };
+  document.getElementById('net-report').onclick = async ()=>{ const u = await svgToPngDataURL(svg()); addToReport({type:'chart', title, imageDataURL: u, citation: note + ' Calculado con "'+APP_LABEL+'" el '+new Date().toLocaleString('es-AR')+'.', tableHTML: out.querySelector('table').outerHTML}); };
+  document.getElementById('net-xlsx').onclick = ()=>downloadXLSX(xlsxName('red_actores'), [{name:'Actores', aoa: [['Actor','Apariciones','Vínculos','Co-apariciones','Intermediación']].concat(cen.map(c=>[c.id, c.n, c.degree, c.wdeg, round2(c.btw)]))}, {name:'Vínculos', aoa: [['Actor A','Actor B','Co-apariciones']].concat(g.edges.map(e=>[e.a, e.b, e.w]))}], [title, note]);
+}
+/* ===== REDES DE ACTORES (fin) ===== */
+
+/* ===== MAPAS MENTALES (inicio) ===== */
+// Árbol {label, n, children}: se arma a partir del sistema de códigos, los relatos, una palabra o una base de datos
+function mindFromCodes(){
+  const u = codeUsage(), root = {label: 'Sistema de códigos', children: []};
+  Object.entries(u).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([path, n])=>{
+    let node = root; path.split('\\').forEach((part, i, arr)=>{ let ch = node.children.find(c=>c.label===part); if(!ch){ ch = {label: part, n: 0, children: []}; node.children.push(ch); } if(i===arr.length-1) ch.n += n; node = ch; });
+  });
+  const sum = nd=>{ nd.children.forEach(sum); nd.total = (nd.n||0) + nd.children.reduce((s,c)=>s+c.total, 0); return nd.total; }; sum(root);
+  root.children.sort((a,b)=>b.total-a.total); root.children.forEach(c=>c.children.sort((a,b)=>b.total-a.total));
+  return root;
+}
+function mindFromTopics(){
+  const t = new Map();
+  Object.values(qualDocs).forEach(d=>d.entries.forEach(e=>(e.topicos||[]).forEach(tp=>{ if(!t.has(tp)) t.set(tp, {n:0, kw:new Map()}); const x = t.get(tp); x.n++; (e.keywords||[]).forEach(k=>x.kw.set(k, (x.kw.get(k)||0)+1)); })));
+  return {label: 'Relatos', children: [...t.entries()].sort((a,b)=>b[1].n-a[1].n).map(([tp, x])=>({label: tp, n: x.n, children: [...x.kw.entries()].sort((a,b)=>b[1]-a[1]).slice(0, 7).map(([k,n])=>({label: k, n, children: []}))}))};
+}
+function mindFromWord(term){
+  const t = term.trim().toLowerCase(), pre = t.endsWith('*'), base = pre ? t.slice(0,-1) : t;
+  const o = {minLen: 3, stop: true, bigrams: false, excl: new Set()};
+  const hit = w=>pre ? w.startsWith(base) : w===base;
+  const sents = [];
+  waUnits('rel').concat(waUnits('ivr')).forEach(u=>String(u.text||'').split(/(?<=[.!?;])\s+/).forEach(s=>{ const ws = waTerms(s, o); if(ws.some(hit)) sents.push(ws.filter(w=>!hit(w))); }));
+  const cnt = new Map(); sents.forEach(ws=>new Set(ws).forEach(w=>cnt.set(w, (cnt.get(w)||0)+1)));
+  const top = [...cnt.entries()].sort((a,b)=>b[1]-a[1] || a[0].localeCompare(b[0])).slice(0, 8);
+  return {label: term, sentences: sents.length, children: top.map(([w, n])=>{ const c2 = new Map(); sents.filter(ws=>ws.includes(w)).forEach(ws=>new Set(ws).forEach(x=>{ if(x!==w) c2.set(x, (c2.get(x)||0)+1); }));
+    return {label: w, n, children: [...c2.entries()].filter(e=>e[1]>=2).sort((a,b)=>b[1]-a[1] || a[0].localeCompare(b[0])).slice(0, 3).map(([x,n2])=>({label: x, n: n2, children: []}))}; })};
+}
+function mindFromBase(colA, colB){
+  const ds = datasets[active], rows = getFiltered(), m = new Map();
+  rows.forEach(r=>{ const as = getCategories(ds, r, colA).filter(v=>v!=='(sin dato)'), bs = getCategories(ds, r, colB).filter(v=>v!=='(sin dato)');
+    as.forEach(a=>{ if(!m.has(a)) m.set(a, {n:0, b:new Map()}); const x = m.get(a); x.n++; bs.forEach(b=>x.b.set(b, (x.b.get(b)||0)+1)); }); });
+  return {label: ds.label, children: [...m.entries()].sort((a,b)=>b[1].n-a[1].n).slice(0, 10).map(([a, x])=>({label: a, n: x.n, children: [...x.b.entries()].sort((p,q)=>q[1]-p[1]).slice(0, 5).map(([b,n])=>({label: b, n, children: []}))}))};
+}
+// Disposición radial: el tema en el centro, las ramas alrededor y sus hojas hacia afuera
+let mindCollapsed = new Set(), lastMind = null;
+function mindSvg(root){
+  const W = 900, H = 660, cx = W/2, cy = H/2, R1 = 175, R2 = 290;
+  const kids = root.children, leaves = c=>mindCollapsed.has(c.label) ? 1 : Math.max(1, c.children.length);
+  const totalW = kids.reduce((s,c)=>s+leaves(c), 0) || 1; let a0 = -Math.PI/2;
+  const maxN = Math.max(1, ...kids.map(c=>c.total!=null ? c.total : c.n||0));
+  const txt = (x, y, s, size, anchor, weight, color)=>`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${anchor}" dominant-baseline="middle" font-size="${size}" font-weight="${weight}" font-family="IBM Plex Sans, Arial, sans-serif" fill="${color}" paint-order="stroke" stroke="#fff" stroke-width="3">${esc(s.length>34 ? s.slice(0,33)+'…' : s)}</text>`;
+  let links = '', nodes = '';
+  kids.forEach((c, i)=>{
+    const span = 2*Math.PI*leaves(c)/totalW, a = a0 + span/2, color = GRAPH_COLORS[i % GRAPH_COLORS.length];
+    const x = cx + R1*Math.cos(a), y = cy + R1*Math.sin(a), val = c.total!=null ? c.total : (c.n||0), rr = 7 + 9*Math.sqrt(val/maxN);
+    links += `<path d="M${cx},${cy} Q${(cx + x)/2 + 20*Math.cos(a+Math.PI/2)},${(cy + y)/2 + 20*Math.sin(a+Math.PI/2)} ${x.toFixed(1)},${y.toFixed(1)}" fill="none" stroke="${color}" stroke-width="${(2 + 4*val/maxN).toFixed(1)}" stroke-opacity="0.6"/>`;
+    if(!mindCollapsed.has(c.label)) c.children.forEach((g, j)=>{
+      const b = a - span/2 + span*(j + 0.5)/Math.max(1, c.children.length), gx = cx + R2*Math.cos(b), gy = cy + R2*Math.sin(b), right = Math.cos(b) >= 0;
+      links += `<path d="M${x.toFixed(1)},${y.toFixed(1)} Q${(cx + (R1+R2)/2*Math.cos(b)).toFixed(1)},${(cy + (R1+R2)/2*Math.sin(b)).toFixed(1)} ${gx.toFixed(1)},${gy.toFixed(1)}" fill="none" stroke="${color}" stroke-width="1.5" stroke-opacity="0.5"/>`;
+      nodes += `<circle cx="${gx.toFixed(1)}" cy="${gy.toFixed(1)}" r="4" fill="${color}"/>` + txt(gx + (right ? 8 : -8), gy, g.label + (g.n ? ' ('+g.n+')' : ''), 11, right ? 'start' : 'end', 400, '#16232E');
+    });
+    nodes += `<g class="mind-branch" data-label="${esc(c.label)}" style="cursor:pointer"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rr.toFixed(1)}" fill="${color}" stroke="#fff" stroke-width="2"><title>${esc(c.label)}: ${val}${c.children.length ? ' — tocá para '+(mindCollapsed.has(c.label) ? 'desplegar' : 'plegar')+' sus ramas' : ''}</title></circle>`
+      + txt(x, y + rr + 13, c.label + (val ? ' ('+val+')' : '') + (mindCollapsed.has(c.label) && c.children.length ? ' ＋' : ''), 13, 'middle', 600, color) + '</g>';
+    a0 += span;
+  });
+  nodes += `<circle cx="${cx}" cy="${cy}" r="34" fill="#16232E"/>` + `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-size="13" font-weight="700" font-family="Source Serif 4, Georgia, serif" fill="#fff">${esc(root.label.length>16 ? root.label.slice(0,15)+'…' : root.label)}</text>`;
+  return `<svg id="mind-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;background:#fff;border:1px solid var(--line);border-radius:6px" role="img" aria-label="Mapa mental: ${esc(root.label)}">${links}${nodes}</svg>`;
+}
+function setupMindControls(){
+  const src = document.getElementById('mm-src').value, ds = datasets[active];
+  document.getElementById('mm-term-wrap').style.display = src==='word' ? '' : 'none';
+  document.getElementById('mm-cols-wrap').style.display = src==='base' ? '' : 'none';
+  if(src==='base' && ds){ ['mm-colA','mm-colB'].forEach((id,i)=>{ const s = document.getElementById(id), pv = s.value, cols = catColumns(ds); s.innerHTML = cols.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join(''); if([...s.options].some(o=>o.value===pv)) s.value = pv; else if(cols[i]) s.value = cols[i]; }); }
+}
+function renderMindUI(){
+  const sec = document.getElementById('mind-section'); if(!sec) return;
+  const opts = [];
+  if(Object.keys(codeUsage()).length) opts.push(['codes','Sistema de códigos']);
+  if(Object.values(qualDocs).some(d=>d.entries.some(e=>(e.topicos||[]).length))) opts.push(['topics','Relatos: tópicos y sus actores']);
+  if(Object.values(qualDocs).some(d=>d.entries.length) || Object.keys(interviews).length) opts.push(['word','Una palabra y lo que la rodea']);
+  if(datasets[active] && catColumns(datasets[active]).length>=2) opts.push(['base','Base de datos: dos columnas']);
+  sec.style.display = opts.length ? '' : 'none'; if(!opts.length) return;
+  const sel = document.getElementById('mm-src'), pv = sel.value; sel.innerHTML = opts.map(([v,l])=>`<option value="${v}">${l}</option>`).join(''); if(opts.some(o=>o[0]===pv)) sel.value = pv;
+  setupMindControls();
+}
+function runMind(keepCollapsed){
+  const out = document.getElementById('mm-out'), src = document.getElementById('mm-src').value;
+  if(!keepCollapsed) mindCollapsed = new Set();
+  let root, desc;
+  if(src==='codes'){ root = mindFromCodes(); desc = 'Sistema de códigos: cada rama es un código padre y sus subcódigos; entre paréntesis, la cantidad de veces que se usó.'; }
+  else if(src==='topics'){ root = mindFromTopics(); desc = 'Relatos: cada rama es un tópico (entre paréntesis, la cantidad de relatos) con las palabras clave (actores) que más aparecen en sus relatos.'; }
+  else if(src==='word'){ const term = document.getElementById('mm-term').value.trim(); if(!term){ out.innerHTML = '<p class="empty">Escribí una palabra (con * para incluir variantes: "despid*").</p>'; return; }
+    root = mindFromWord(term); desc = `"${term}" en ${root.sentences} oraciones de relatos y entrevistas: cada rama es una palabra que aparece en las mismas oraciones (entre paréntesis, en cuántas), y sus hojas, las palabras que acompañan a ambas.`; }
+  else { const a = document.getElementById('mm-colA').value, b = document.getElementById('mm-colB').value; if(!a || !b || a===b){ out.innerHTML = '<p class="empty">Elegí dos columnas distintas.</p>'; return; }
+    root = mindFromBase(a, b); desc = `"${datasets[active].label}": cada rama es una categoría de "${a}" (entre paréntesis, los registros filtrados) con los valores más frecuentes de "${b}".`; }
+  if(!root.children.length){ out.innerHTML = '<p class="empty">No hay contenido para armar el mapa con esta fuente.</p>'; return; }
+  lastMind = {root, desc, src};
+  out.innerHTML = `<p class="hint" style="margin:6px 0">${esc(desc)} Tocá una rama para plegarla o desplegarla.</p>${mindSvg(root)}
+    <div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="mini-export" id="mm-report">📌 Agregar al informe</button><button type="button" class="mini-export" id="mm-png">⭳ Imagen</button><button type="button" class="mini-export" id="mm-svgdl">⭳ SVG (editable)</button></div>`;
+  out.querySelectorAll('.mind-branch').forEach(g=>g.addEventListener('click', ()=>{ const l = g.dataset.label; if(mindCollapsed.has(l)) mindCollapsed.delete(l); else mindCollapsed.add(l); runMind(true); }));
+  const svg = ()=>document.getElementById('mind-svg'), title = 'Mapa mental: '+root.label;
+  if(!keepCollapsed) logEvent('texto', `${title}. ${desc}`);
+  document.getElementById('mm-png').onclick = async ()=>{ const u = await svgToPngDataURL(svg()); const a = document.createElement('a'); a.href = u; a.download = 'mapa_mental.png'; a.click(); };
+  document.getElementById('mm-svgdl').onclick = ()=>svgDownload(svg(), 'mapa_mental');
+  document.getElementById('mm-report').onclick = async ()=>{ const u = await svgToPngDataURL(svg()); addToReport({type:'chart', title, imageDataURL: u, citation: desc + ' Elaborado con "'+APP_LABEL+'" el '+new Date().toLocaleString('es-AR')+'.'}); };
+}
+/* ===== MAPAS MENTALES (fin) ===== */
+
+/* ===== CONFLICTIVIDAD: indicadores, picos y ciclos (inicio) ===== */
+function confPeriodOf(ds, r, gran){
+  if(gran==='anio') return r.__Año!=null ? String(r.__Año) : null;
+  const d = ds.dateCol ? r[ds.dateCol] : null; return d instanceof Date ? periodKey(d, gran) : null;
+}
+function confFill(keys, gran){
+  if(!keys.length) return [];
+  if(gran==='anio'){ const ys = keys.map(Number), out = []; for(let y=Math.min(...ys); y<=Math.max(...ys); y++) out.push(String(y)); return out; }
+  return fillPeriods(keys, gran);
+}
+function conflictIndicators(ds, rows, gran, actorCol, formCol){
+  const per = new Map(), allForms = new Map(); let undated = 0;
+  rows.forEach(r=>{
+    const k = confPeriodOf(ds, r, gran); if(!k){ undated++; return; }
+    if(!per.has(k)) per.set(k, {n:0, actors:new Set(), forms:new Map()}); const p = per.get(k); p.n++;
+    if(actorCol) getCategories(ds, r, actorCol).forEach(a=>{ if(a!=='(sin dato)') p.actors.add(a); });
+    if(formCol) getCategories(ds, r, formCol).forEach(f=>{ if(f!=='(sin dato)'){ p.forms.set(f, (p.forms.get(f)||0)+1); allForms.set(f, (allForms.get(f)||0)+1); } });
+  });
+  const keys = confFill([...per.keys()], gran);
+  const series = keys.map(k=>{ const p = per.get(k) || {n:0, actors:new Set(), forms:new Map()}; return {k, n: p.n, actors: p.actors.size, forms: p.forms}; });
+  const ns = series.map(s=>s.n), N = ns.length, mean = ns.reduce((a,b)=>a+b,0)/Math.max(1,N);
+  const sd = N>1 ? Math.sqrt(ns.reduce((a,b)=>a+(b-mean)*(b-mean),0)/(N-1)) : 0;
+  const sorted = ns.slice().sort((a,b)=>a-b), median = N ? (N%2 ? sorted[(N-1)/2] : (sorted[N/2-1]+sorted[N/2])/2) : 0;
+  const kForms = allForms.size;
+  series.forEach(s=>{
+    s.peak = s.n>0 && s.n > mean + 1.5*sd;
+    const tot = [...s.forms.values()].reduce((a,b)=>a+b,0);
+    s.pielou = (formCol && tot>0 && kForms>1) ? -[...s.forms.values()].reduce((h,c)=>h + (c/tot)*Math.log(c/tot), 0)/Math.log(kForms) : null;
+    s.topForm = tot ? [...s.forms.entries()].sort((a,b)=>b[1]-a[1])[0][0] : '';
+  });
+  // ciclos: dos o más períodos seguidos por encima de la mediana
+  const cycles = []; let cur = null;
+  series.forEach((s,i)=>{ if(s.n > median){ if(!cur) cur = {from:i, to:i}; else cur.to = i; } else { if(cur && cur.to>cur.from) cycles.push(cur); cur = null; } });
+  if(cur && cur.to>cur.from) cycles.push(cur);
+  cycles.forEach(c=>{ const seg = series.slice(c.from, c.to+1); c.len = seg.length; c.total = seg.reduce((a,b)=>a+b.n,0); const pk = seg.reduce((m,x)=>x.n>m.n?x:m, seg[0]); c.peakK = pk.k; c.peakN = pk.n; c.fromK = series[c.from].k; c.toK = series[c.to].k; });
+  series.forEach((s,i)=>{ s.inCycle = cycles.some(c=>i>=c.from && i<=c.to); });
+  return {series, mean, sd, median, cycles, undated, total: rows.length - undated, forms: [...allForms.entries()].sort((a,b)=>b[1]-a[1])};
+}
+const CONF_GRAN = {mes:'mes', trimestre:'trimestre', anio:'año'};
+function setupConfControls(){
+  const ds = datasets[active]; if(!ds) return;
+  const g = document.getElementById('conf-gran'), pv = g.value;
+  g.innerHTML = (ds.dateCol ? '<option value="mes">Mes</option><option value="trimestre">Trimestre</option>' : '') + '<option value="anio">Año</option>';
+  if([...g.options].some(o=>o.value===pv)) g.value = pv; else g.value = ds.dateCol ? 'mes' : 'anio';
+  const cats = catColumns(ds).filter(c=>!isPeriodCol(c));
+  ['conf-actor','conf-form'].forEach((id, i)=>{ const s = document.getElementById(id), p = s.value; s.innerHTML = '<option value="">— ninguna —</option>' + cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    const first = s.dataset.ds!==active; s.dataset.ds = active; // la primera vez que se abre cada base, se sugieren las columnas
+    if(!first && [...s.options].some(o=>o.value===p)) s.value = p; else { const guess = cats.find(c=>i===0 ? /organiz|actor|sindic|gremio|protagon/i.test(c) : /forma|repertorio|tipo de acci|accion|medida/i.test(c)); s.value = guess || ''; } });
+}
+function renderConf(){
+  setupConfControls();
+  const ds = datasets[active], out = document.getElementById('conf-out'); if(!ds) return;
+  const gran = document.getElementById('conf-gran').value, actorCol = document.getElementById('conf-actor').value, formCol = document.getElementById('conf-form').value;
+  if(!ds.dateCol && !ds.rows.some(r=>r.__Año!=null)){ out.innerHTML = '<p class="empty">Para los indicadores de conflictividad hace falta una columna de fecha o de año.</p>'; return; }
+  const R = conflictIndicators(ds, getFiltered(), gran, actorCol, formCol);
+  if(!R.series.length){ out.innerHTML = '<p class="empty">No hay registros con fecha en los filtros actuales.</p>'; return; }
+  const lab = k=>gran==='anio' ? k : periodLabel(k), unit = CONF_GRAN[gran];
+  const peaks = R.series.filter(s=>s.peak), maxS = R.series.reduce((m,s)=>s.n>m.n?s:m, R.series[0]);
+  let html = `<p style="margin:6px 0">${R.total} conflictos en ${R.series.length} ${unit==='mes' ? 'meses' : unit==='año' ? 'años' : 'trimestres'} (${lab(R.series[0].k)} a ${lab(R.series[R.series.length-1].k)}): <strong>${fmtN(R.mean,1)}</strong> por ${unit} en promedio, mediana ${fmtN(R.median,1)}. Máximo: <strong>${maxS.n}</strong> en ${lab(maxS.k)}.${R.undated ? ` ${R.undated} registros sin fecha no se cuentan.` : ''}</p>
+    <div class="chart-box" style="height:300px"><canvas id="c-conf"></canvas></div>
+    <p class="hint" style="margin:4px 0 10px">Barras oscuras: períodos dentro de un ciclo de protesta. En terracota: picos (más de 1,5 desvíos por encima del promedio). Línea: la mediana. ${glLink('ciclos','¿Cómo se definen picos y ciclos?')}</p>`;
+  html += R.cycles.length ? `<p style="margin:10px 0 4px"><strong>Ciclos de protesta</strong> (${R.cycles.length}): tramos de dos o más ${unit==='mes' ? 'meses' : unit==='año' ? 'años' : 'trimestres'} seguidos por encima de la mediana.</p><div class="tablewrap"><table><thead><tr><th>Desde</th><th>Hasta</th><th>Duración</th><th>Conflictos</th><th>Momento más alto</th></tr></thead><tbody>${R.cycles.map(c=>`<tr><td>${lab(c.fromK)}</td><td>${lab(c.toK)}</td><td>${c.len}</td><td>${c.total}</td><td>${lab(c.peakK)} (${c.peakN})</td></tr>`).join('')}</tbody></table></div>` : `<p class="hint">No hay ciclos: ningún tramo de dos o más períodos seguidos supera la mediana.</p>`;
+  if(peaks.length) html += `<p style="margin:10px 0 4px"><strong>Picos:</strong> ${peaks.map(s=>`${lab(s.k)} (${s.n})`).join(', ')}.</p>`;
+  const rowsT = R.series.length>60 ? R.series.filter(s=>s.n>0) : R.series;
+  html += `<details style="margin-top:10px"><summary style="cursor:pointer"><strong>Indicadores por ${unit}</strong></summary><div class="tablewrap" style="margin-top:6px"><table><thead><tr><th>Período</th><th>Conflictos</th>${actorCol ? '<th>Actores distintos</th>' : ''}${formCol ? '<th>Forma principal</th><th>Diversidad del repertorio</th>' : ''}</tr></thead><tbody>${rowsT.map(s=>`<tr${s.peak ? ' style="background:rgba(181,83,60,.08)"' : ''}><td>${lab(s.k)}</td><td>${s.n}</td>${actorCol ? `<td>${s.actors}</td>` : ''}${formCol ? `<td>${esc(s.topForm)}</td><td>${s.pielou==null ? '—' : fmtN(s.pielou,2)}</td>` : ''}</tr>`).join('')}</tbody></table></div></details>`;
+  if(formCol && R.forms.length){
+    html += `<p style="margin:12px 0 4px"><strong>Repertorio a lo largo del tiempo</strong> ("${esc(formCol)}"): peso de cada forma en cada período. La diversidad (equidad de Pielou) va de 0 (una sola forma) a 1 (todas con el mismo peso).</p><div class="chart-box" style="height:300px"><canvas id="c-conf-rep"></canvas></div>`;
+  }
+  html += `<div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="mini-export" id="conf-report">📌 Agregar al informe</button><button type="button" class="mini-export" id="conf-xlsx">⭳ Excel</button></div>`;
+  out.innerHTML = html;
+  destroyChart('c-conf');
+  charts['c-conf'] = new Chart(document.getElementById('c-conf'), {type:'bar', data:{labels: R.series.map(s=>lab(s.k)), datasets:[
+    {type:'line', label:'Mediana', data: R.series.map(()=>R.median), borderColor:'#16232E', borderWidth:1.5, borderDash:[5,4], pointRadius:0},
+    {label:'Conflictos', data: R.series.map(s=>s.n), backgroundColor: R.series.map(s=>s.peak ? '#B5533C' : s.inCycle ? '#1F4C4E' : '#9DBDBE')}]},
+    options:{maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, title:{display:true, text:'Conflictos'}}}}});
+  if(formCol && R.forms.length){
+    const top = R.forms.slice(0, 6).map(f=>f[0]), other = R.forms.length>6;
+    const ser = R.series.filter(s=>s.n>0);
+    destroyChart('c-conf-rep');
+    charts['c-conf-rep'] = new Chart(document.getElementById('c-conf-rep'), {type:'bar', data:{labels: ser.map(s=>lab(s.k)), datasets: top.map((f,i)=>({label:f, data: ser.map(s=>{ const t = [...s.forms.values()].reduce((a,b)=>a+b,0); return t ? 100*(s.forms.get(f)||0)/t : 0; }), backgroundColor: GRAPH_COLORS[i%GRAPH_COLORS.length]})).concat(other ? [{label:'Otras', data: ser.map(s=>{ const t = [...s.forms.values()].reduce((a,b)=>a+b,0); return t ? 100*[...s.forms.entries()].filter(([f])=>!top.includes(f)).reduce((a,[,c])=>a+c,0)/t : 0; }), backgroundColor:'#C7D0CD'}] : [])},
+      options:{maintainAspectRatio:false, scales:{x:{stacked:true}, y:{stacked:true, max:100, title:{display:true, text:'% de las formas de protesta'}}}, plugins:{legend:{position:'bottom'}}}});
+  }
+  const title = `Conflictividad por ${unit}: ${ds.label}`, note = `Picos: períodos con más de promedio + 1,5 desvíos (${fmtN(R.mean + 1.5*R.sd,1)} conflictos). Ciclos: dos o más períodos seguidos por encima de la mediana (${fmtN(R.median,1)}).${formCol ? ' Diversidad del repertorio: equidad de Pielou sobre "'+formCol+'".' : ''}`;
+  logEvent('modelos', `Indicadores de conflictividad por ${unit} en «${ds.label}» (${R.total} conflictos, ${R.cycles.length} ciclos, ${peaks.length} picos). ${note}`);
+  document.getElementById('conf-report').onclick = ()=>{ const img = charts['c-conf'].toBase64Image(); addToReport({type:'chart', title, imageDataURL: img, citation: note + ' ' + modelNote(ds, '') + ' Calculado con "'+APP_LABEL+'" el '+new Date().toLocaleString('es-AR')+'.'}); };
+  document.getElementById('conf-xlsx').onclick = ()=>downloadXLSX(xlsxName('conflictividad_'+unit), [
+    {name:'Por período', aoa: [['Período','Conflictos','Pico','En ciclo'].concat(actorCol ? ['Actores distintos'] : [], formCol ? ['Forma principal','Diversidad (Pielou)'] : [])].concat(R.series.map(s=>[lab(s.k), s.n, s.peak ? 'sí' : '', s.inCycle ? 'sí' : ''].concat(actorCol ? [s.actors] : [], formCol ? [s.topForm, s.pielou==null ? '' : round2(s.pielou)] : [])))},
+    {name:'Ciclos', aoa: [['Desde','Hasta','Duración','Conflictos','Momento más alto','Conflictos en el momento más alto']].concat(R.cycles.map(c=>[lab(c.fromK), lab(c.toK), c.len, c.total, lab(c.peakK), c.peakN]))}], [title, note]);
+}
+/* ===== CONFLICTIVIDAD (fin) ===== */
+
 /* ===== OCR: texto desde imágenes, fotos y PDF escaneados (inicio) ===== */
 // Motor: Tesseract (incluido en vendor/tesseract, se descarga solo la primera vez que se usa).
 // Todo se procesa en la computadora: las imágenes no se envían a ningún servidor.
@@ -5631,7 +5961,40 @@ function applyProfile(p, sources, keepCodebook){
   if(!Array.isArray(project.keywordLabels)) project.keywordLabels = [];
   if(sources && Array.isArray(sources.options)){ sourceOptions = sources.options; sourceExtra = sources.extra || ''; }
 }
+
+/* ===== MÓDULOS DEL PROYECTO (inicio) ===== */
+// Cada proyecto elige qué partes usa; las que no, se ocultan para simplificar la pantalla
+const MODULES = [['relatos','Relatos (crónicas fechadas)','tab-texto'], ['entrevistas','Entrevistas','tab-entrevistas'], ['codigos','Códigos, análisis de palabras y mapas mentales','tab-codigos'], ['biblio','Bibliografía','tab-biblio'], ['conflicto','Conflictividad y red de actores (en Gráficos)',null], ['encuesta','Comparar grupos y regresión (en Gráficos)',null]];
+function moduleOn(k){ return !(project.modules && project.modules[k]===false); }
+function applyModules(){
+  MODULES.forEach(([k,,tab])=>{ if(tab){ const b = document.getElementById(tab); if(b) b.hidden = !moduleOn(k); } });
+  const modeBtn = m=>document.querySelector(`#explore .mode-btn[data-mode="${m}"]`);
+  [['conf','conflicto'],['net','conflicto'],['cmp','encuesta'],['reg','encuesta']].forEach(([m,k])=>{ const b = modeBtn(m); if(b) b.hidden = !moduleOn(k); });
+  const cur = document.querySelector('.main-tab[aria-selected="true"]'); if(cur && cur.hidden) showMainPanel('graficos');
+  const am = document.querySelector('#explore .mode-btn.active'); if(am && am.hidden && modeBtn('quick')) modeBtn('quick').click();
+}
+// si se carga contenido de un módulo desactivado, el módulo se activa
+function ensureModulesForContent(){
+  const need = {relatos: Object.keys(qualDocs).length>0, entrevistas: Object.keys(interviews).length>0, biblio: references.length>0};
+  let changed = false; Object.entries(need).forEach(([k, has])=>{ if(has && !moduleOn(k)){ project.modules[k] = true; changed = true; } });
+  if(changed) applyModules();
+}
+function modulesSettingsHtml(){
+  return `<h3 style="font-size:.95rem;margin:16px 0 6px">Módulos de este proyecto</h3>
+    <p class="hint" style="margin-bottom:6px">Las partes que no uses se ocultan, para simplificar la pantalla. Gráficos y Especificidades están siempre. Si cargás contenido de un módulo desactivado, se activa solo.</p>
+    <div class="field" style="max-width:100%;margin-bottom:8px"><label>Disciplina</label><select id="proj-discipline"><option value="sociales">Ciencias sociales</option><option value="biologia">Biología: Hidrobiología y Botánica (módulos en desarrollo)</option><option value="ambas">Ambas</option></select></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:4px 14px">${MODULES.map(([k,l])=>`<label class="chk-opt" style="white-space:normal"><input type="checkbox" class="proj-mod" data-k="${k}" ${moduleOn(k)?'checked':''}> ${esc(l)}</label>`).join('')}</div>`;
+}
+function bindModulesSettings(){
+  const d = document.getElementById('proj-discipline'); if(!d) return;
+  d.value = project.discipline || 'sociales';
+  d.onchange = ()=>{ project.discipline = d.value; persistSession(); };
+  document.querySelectorAll('.proj-mod').forEach(c=>c.onchange = ()=>{ project.modules = project.modules || {}; project.modules[c.dataset.k] = c.checked; applyModules(); logEvent('tipos', `Módulo «${MODULES.find(m=>m[0]===c.dataset.k)[1]}» ${c.checked ? 'activado' : 'desactivado'} en el proyecto.`); persistSession(); });
+}
+/* ===== MÓDULOS DEL PROYECTO (fin) ===== */
+
 function afterProjectChange(){
+  applyModules();
   reparseQualTopics();
   renderQualTopicChecks(); renderQualUI();
   updateProjectLine();
@@ -5645,6 +6008,7 @@ function openProjectSettings(){
   const placeCount = Object.keys(project.places||{}).length;
   const body = `
     <div class="field" style="max-width:100%;margin-bottom:14px"><label>Nombre del proyecto</label><input type="text" id="proj-name" value="${esc(project.name||'')}"></div>
+    ${modulesSettingsHtml()}
 
     <h3 style="font-size:.95rem;margin:16px 0 6px">Tópicos de los relatos (Word)</h3>
     <p class="hint" style="margin-bottom:6px">Uno por línea. Se reconocen al inicio de un párrafo con fecha, ej. "09/01/2014 – TÓPICO texto…" o "09/01/2014 – PALABRA CLAVE – TÓPICO texto…". No importan mayúsculas ni tildes.</p>
@@ -5681,6 +6045,7 @@ function openProjectSettings(){
     <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button type="button" class="go" id="proj-save">Guardar y cerrar</button>
       <button type="button" class="mini-export" id="proj-delete" style="margin-left:auto;color:var(--rust)" ${projectsIndex.list.length<2?'disabled title="Es el único proyecto: para empezar de cero, usá Vaciar los datos de este proyecto"':''}>Eliminar este proyecto</button></div>`;
   showModal('⚙ Configuración del proyecto', body, {wide:true});
+  bindModulesSettings();
   mountSourceEditor('proj-src');
   const saveTopicsAndName = ()=>{
     project.name = document.getElementById('proj-name').value.trim() || 'Mi proyecto';
@@ -5823,7 +6188,7 @@ function collapseAtStartup(){
 /* --- Solapas principales: Gráficos / Texto / Bibliografía --- */
 const MAIN_PANELS = ['graficos','texto','entrevistas','codigos','biblio','espec'];
 function showMainPanel(id, opts={}){
-  if(id==='codigos') setTimeout(renderWordsUI, 0);
+  if(id==='codigos') setTimeout(()=>{ renderWordsUI(); renderMindUI(); }, 0);
   if(!MAIN_PANELS.includes(id)) id = 'graficos';
   MAIN_PANELS.forEach(p=>{
     const on = p===id;
@@ -5859,7 +6224,7 @@ document.querySelectorAll('.main-tab').forEach(t=>{
   });
 });
 function updateMainTabCounts(){
-  try{ renderWordsUI(); }catch(e){}
+  try{ renderWordsUI(); renderMindUI(); ensureModulesForContent(); }catch(e){}
   const nQ = Object.keys(qualDocs).length, nI = Object.keys(interviews).length, nM = Object.values(datasets).filter(isCodingMatrix).length;
   document.getElementById('tab-count-entrevistas').textContent = nI ? '('+nI+')' : '';
   document.getElementById('tab-count-codigos').textContent = nM ? '('+nM+')' : '';
@@ -6757,10 +7122,14 @@ document.querySelectorAll('#explore .mode-btn').forEach(b=>{ // solo los modos d
     document.getElementById('timeline-view').style.display = m==='timeline' ? 'block':'none';
     document.getElementById('cmp-view').style.display = m==='cmp' ? 'block':'none';
     document.getElementById('reg-view').style.display = m==='reg' ? 'block':'none';
+    document.getElementById('net-view').style.display = m==='net' ? 'block':'none';
+    document.getElementById('conf-view').style.display = m==='conf' ? 'block':'none';
     if(m==='cross') renderCross();
     if(m==='quality') renderQuality();
     if(m==='map') renderMap();
     if(m==='timeline') renderTimeline();
+    if(m==='net') renderNet();
+    if(m==='conf') renderConf();
   };
 });
 
@@ -7516,20 +7885,96 @@ function renderTimeline(){
   });
 }
 
-function renderMap(){
-  const ds = datasets[active];
-  const wrap = document.getElementById('map-svg-wrap');
-  if(!ds){ wrap.innerHTML=''; return; }
+/* ===== MAPA CON COORDENADAS REALES (inicio) ===== */
+// Mapa interactivo (Leaflet) sobre una cartografía incluida (Natural Earth), que funciona sin conexión.
+// El fondo de OpenStreetMap es opcional y requiere internet.
+let leafletMap = null, osmLayer = null, lastMapPoints = null, mapRenderSeq = 0;
+function loadCssOnce(href){ if([...document.querySelectorAll('link[rel=stylesheet]')].some(l=>l.getAttribute('href')===href)) return; const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = href; document.head.appendChild(l); }
+async function loadMapLibs(){
+  loadCssOnce('vendor/leaflet/leaflet.css');
+  const limit = new Promise((_, rej)=>setTimeout(()=>rej(new Error('la librería del mapa no cargó')), 5000)); // si no carga, queda el mapa esquemático
+  if(!window.L) await Promise.race([loadScriptOnce('vendor/leaflet/leaflet.js'), limit]);
+  if(!window.TELAR_BASE) await Promise.race([loadScriptOnce('vendor/mapa/base.js'), limit]);
+}
+function latLonCols(ds){
+  const nums = numColumns(ds);
+  const lat = nums.find(c=>/^(lat|latitud|latitude)$/i.test(normColName(c))), lon = nums.find(c=>/^(lon|lng|long|longitud|longitude)$/i.test(normColName(c)));
+  return lat && lon ? {lat, lon} : null;
+}
+// puntos del mapa: por lugar (lista de coordenadas del proyecto) o por coordenadas de cada registro
+function mapPoints(ds){
+  const rows = getFiltered(), Wm = weighter(ds), ll = latLonCols(ds);
+  if(ll){
+    const locCol = ds.columns.find(c=>colRole(ds,c)==='lugar'), acc = new Map();
+    rows.forEach(r=>{ const la = r[ll.lat], lo = r[ll.lon]; if(typeof la!=='number' || typeof lo!=='number' || Math.abs(la)>90 || Math.abs(lo)>180) return;
+      const key = la.toFixed(4)+','+lo.toFixed(4); if(!acc.has(key)) acc.set(key, {lat: la, lon: lo, count: 0, name: locCol ? getCategories(ds, r, locCol)[0] : ''}); acc.get(key).count += Wm(r); });
+    const points = [...acc.values()].map(p=>Object.assign(p, {count: round2(p.count), name: p.name && p.name!=='(sin dato)' ? p.name : `${fmtN(p.lat,3)}, ${fmtN(p.lon,3)}`}));
+    return points.length ? {points, how: `coordenadas de cada registro ("${ll.lat}" y "${ll.lon}")`} : {error: `Las columnas "${ll.lat}" y "${ll.lon}" no tienen coordenadas válidas en los registros filtrados.`};
+  }
   const locCol = ds.columns.find(c=>colRole(ds,c)==='lugar');
-  if(!locCol){ wrap.innerHTML = '<p class="empty">Esta base no tiene ninguna columna de tipo "Lugar". Podés marcarla en ⚙ Columnas de esta base.</p>'; return; }
-  if(!Object.keys(project.places||{}).length){ wrap.innerHTML = '<p class="empty">Todavía no hay coordenadas cargadas. Cargá un listado de lugares (nombre, latitud, longitud) en ⚙ Configurar proyecto.</p>'; return; }
-  const rows = getFiltered();
-  const counts = {};
-  const Wm = weighter(ds);
-  rows.forEach(r=>{ const w = Wm(r); getCategories(ds,r,locCol).forEach(loc=>{ if(loc==='(sin dato)') return; counts[loc]=(counts[loc]||0)+w; }); });
-  Object.keys(counts).forEach(k=>{ counts[k] = round2(counts[k]); });
-  const points = Object.entries(counts).map(([name,count])=>{ const c = findPlaceCoord(name); return c ? {name,count,lat:c[0],lon:c[1]} : null; }).filter(Boolean);
-  if(!points.length){ wrap.innerHTML = '<p class="empty">Ningún valor de "'+esc(locCol)+'" coincide con los lugares cargados en la configuración del proyecto. Revisá que los nombres sean iguales o sumá los que falten.</p>'; return; }
+  if(!locCol) return {error: 'Esta base no tiene una columna de tipo "Lugar" ni columnas de latitud y longitud. Podés marcar el lugar en ⚙ Columnas de esta base.'};
+  if(!Object.keys(project.places||{}).length) return {error: 'Todavía no hay coordenadas cargadas. Cargá un listado de lugares (nombre, latitud, longitud) en ⚙ Configurar proyecto, o sumá a la base columnas de latitud y longitud.'};
+  const counts = {}; rows.forEach(r=>{ const w = Wm(r); getCategories(ds,r,locCol).forEach(loc=>{ if(loc==='(sin dato)') return; counts[loc]=(counts[loc]||0)+w; }); });
+  const points = Object.entries(counts).map(([name,count])=>{ const c = findPlaceCoord(name); return c ? {name, count: round2(count), lat:c[0], lon:c[1]} : null; }).filter(Boolean);
+  if(!points.length) return {error: 'Ningún valor de "'+locCol+'" coincide con los lugares cargados en la configuración del proyecto. Revisá que los nombres sean iguales o sumá los que falten.'};
+  const missing = Object.keys(counts).filter(n=>!findPlaceCoord(n));
+  return {points, how: `lugares de "${locCol}" con las coordenadas del proyecto`, missing};
+}
+async function renderMap(){
+  const ds = datasets[active], wrap = document.getElementById('map-svg-wrap'); if(!ds){ wrap.innerHTML = ''; return; }
+  const seq = ++mapRenderSeq; // solo cuenta el último pedido de dibujo
+  const R = mapPoints(ds); if(R.error){ wrap.innerHTML = '<p class="empty">'+esc(R.error)+'</p>'; return; }
+  lastMapPoints = R;
+  if(document.getElementById('map-view').style.display==='none'){ renderMapSchematic(R.points); return; } // oculto: el interactivo se arma al mostrarlo
+  try{ await loadMapLibs(); }catch(e){ if(seq===mapRenderSeq) renderMapSchematic(R.points); return; }
+  if(seq!==mapRenderSeq) return;
+  if(leafletMap){ try{ leafletMap.remove(); }catch(e){} leafletMap = null; osmLayer = null; }
+  wrap.innerHTML = `<div id="map-leaflet" style="height:460px;border:1px solid var(--line);border-radius:6px;background:#E8F0F2"></div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:8px">
+      <label class="chk-opt"><input type="checkbox" id="map-osm"> Fondo detallado (OpenStreetMap, requiere internet)</label>
+      <span class="hint" style="margin:0">${R.points.length} lugares · ${esc(R.how)}${R.missing && R.missing.length ? ` · sin coordenadas: ${R.missing.slice(0,5).map(esc).join(', ')}${R.missing.length>5 ? '…' : ''}` : ''}</span>
+      <span style="margin-left:auto;display:flex;gap:8px"><button type="button" class="mini-export" id="map-report">📌 Agregar al informe</button><button type="button" class="mini-export" id="map-png">⭳ Imagen</button></span>
+    </div>`;
+  const map = L.map('map-leaflet', {zoomSnap: 0.25, attributionControl: true, preferCanvas: false});
+  leafletMap = map;
+  const b = L.latLngBounds(R.points.map(p=>[p.lat, p.lon]));
+  if(R.points.length===1) map.setView(b.getCenter(), 8); else map.fitBounds(b.pad(0.25)); // primero la vista; después las capas
+  L.geoJSON(TELAR_BASE.paises, {style: {color:'#9AAAAE', weight:1, fillColor:'#F4F6F5', fillOpacity:1}, interactive:false}).addTo(map);
+  L.geoJSON(TELAR_BASE.provincias, {style: {color:'#B8C3C0', weight:0.7, fill:false}, interactive:false}).addTo(map);
+  map.attributionControl.setPrefix(false); map.attributionControl.addAttribution('Cartografía: Natural Earth');
+  const maxC = Math.max(...R.points.map(p=>p.count));
+  const sorted = R.points.slice().sort((a,b)=>b.count-a.count);
+  sorted.forEach((p,i)=>{ const color = p.count===maxC ? '#B5533C' : '#2F6B6E';
+    const m = L.circleMarker([p.lat, p.lon], {radius: 5 + 20*Math.sqrt(p.count/maxC), color, weight:1.5, fillColor: color, fillOpacity:0.5}).addTo(map);
+    m.bindTooltip(`${esc(p.name)} (${p.count})`, {permanent: i<12, direction:'top', className:'map-label'}); });
+  document.getElementById('map-osm').onchange = e=>{
+    if(e.target.checked){ osmLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 18, attribution: '© colaboradores de OpenStreetMap'}).addTo(map); osmLayer.bringToBack(); }
+    else if(osmLayer){ map.removeLayer(osmLayer); osmLayer = null; }
+  };
+  const title = 'Mapa: '+ds.label;
+  document.getElementById('map-png').onclick = async ()=>{ const u = await svgToPngDataURL(mapStaticSvg(R.points)); const a = document.createElement('a'); a.href = u; a.download = 'mapa.png'; a.click(); };
+  document.getElementById('map-report').onclick = async ()=>{ const u = await svgToPngDataURL(mapStaticSvg(R.points)); addToReport({type:'chart', title, imageDataURL: u, citation: `Registros por lugar (${R.how}). ${modelNote(ds, '')} Cartografía: Natural Earth. Elaborado con "${APP_LABEL}" el ${new Date().toLocaleString('es-AR')}.`}); };
+}
+// imagen estática del mapa (para el informe y la descarga), con la misma cartografía
+function mapStaticSvg(points){
+  const lats = points.map(p=>p.lat), lons = points.map(p=>p.lon);
+  let la0 = Math.min(...lats), la1 = Math.max(...lats), lo0 = Math.min(...lons), lo1 = Math.max(...lons);
+  const padLa = Math.max(0.5, (la1-la0)*0.25), padLo = Math.max(0.7, (lo1-lo0)*0.25); la0 -= padLa; la1 += padLa; lo0 -= padLo; lo1 += padLo;
+  const k = Math.cos((la0+la1)/2*Math.PI/180), W = 760, H = Math.max(360, Math.min(900, W*(la1-la0)/((lo1-lo0)*k)));
+  const px = lo=>(lo-lo0)/(lo1-lo0)*W, py = la=>(la1-la)/(la1-la0)*H;
+  const ring = r=>'M'+r.map(([x,y])=>px(x).toFixed(1)+','+py(y).toFixed(1)).join('L')+'Z';
+  const path = g=>{ const polys = g.type==='Polygon' ? [g.coordinates] : g.type==='MultiPolygon' ? g.coordinates : []; return polys.map(pl=>pl.map(ring).join('')).join(''); };
+  const near = f=>{ const bb = JSON.stringify(f.geometry.coordinates).match(/-?\d+\.?\d*/g).map(Number); let x0=180,x1=-180,y0=90,y1=-90; for(let i=0;i+1<bb.length;i+=2){ x0=Math.min(x0,bb[i]); x1=Math.max(x1,bb[i]); y0=Math.min(y0,bb[i+1]); y1=Math.max(y1,bb[i+1]); } return !(x1<lo0 || x0>lo1 || y1<la0 || y0>la1); };
+  const base = (window.TELAR_BASE ? TELAR_BASE.paises.features.filter(near) : []).map(f=>`<path d="${path(f.geometry)}" fill="#F4F6F5" stroke="#9AAAAE" stroke-width="1"/>`).join('')
+    + (window.TELAR_BASE ? TELAR_BASE.provincias.features.filter(near) : []).map(f=>`<path d="${path(f.geometry)}" fill="none" stroke="#B8C3C0" stroke-width="0.7"/>`).join('');
+  const maxC = Math.max(...points.map(p=>p.count));
+  const marks = points.slice().sort((a,b)=>b.count-a.count).map((p,i)=>{ const r = 5 + 20*Math.sqrt(p.count/maxC), c = p.count===maxC ? '#B5533C' : '#2F6B6E', x = px(p.lon), y = py(p.lat);
+    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${c}" fill-opacity="0.5" stroke="${c}" stroke-width="1.5"/>` + (i<15 ? `<text x="${x.toFixed(1)}" y="${(y-r-4).toFixed(1)}" text-anchor="middle" font-size="12" font-family="IBM Plex Sans, Arial, sans-serif" fill="#16232E" paint-order="stroke" stroke="#fff" stroke-width="3">${esc(p.name)} (${p.count})</text>` : ''); }).join('');
+  const svg = new DOMParser().parseFromString(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H.toFixed(0)}"><rect width="${W}" height="${H.toFixed(0)}" fill="#E8F0F2"/>${base}${marks}<text x="${W-6}" y="${(H-6).toFixed(0)}" text-anchor="end" font-size="10" fill="#4C5B60" font-family="Arial, sans-serif">Cartografía: Natural Earth</text></svg>`, 'image/svg+xml').documentElement;
+  return svg;
+}
+function renderMapSchematic(points){
+  const wrap = document.getElementById('map-svg-wrap');
   const lats = points.map(p=>p.lat), lons = points.map(p=>p.lon);
   const latMin=Math.min(...lats)-0.6, latMax=Math.max(...lats)+0.6, lonMin=Math.min(...lons)-1.2, lonMax=Math.max(...lons)+1.2;
   const W=480, H=Math.max(360, Math.min(760, 360*(latMax-latMin)/((lonMax-lonMin)||1)*0.6+120)), pad=44;
@@ -7548,6 +7993,7 @@ function renderMap(){
   svg += '</svg>';
   wrap.innerHTML = svg;
 }
+/* ===== MAPA CON COORDENADAS REALES (fin) ===== */
 
 function levenshtein(a, b){
   const m = a.length, n = b.length;
@@ -7757,6 +8203,8 @@ function setupHelp(){
   });
 }
 const GLOSSARY = [
+  ['ciclos','Picos y ciclos de protesta','Un pico es un período (mes, trimestre o año) con una cantidad de conflictos que supera el promedio en más de 1,5 desvíos estándar. Un ciclo de protesta es un tramo de dos o más períodos seguidos por encima de la mediana. Son criterios descriptivos y fijos, para comparar entre bases y períodos; no reemplazan el análisis histórico de cada momento. La diversidad del repertorio (equidad de Pielou) va de 0 (una sola forma de protesta) a 1 (todas las formas con el mismo peso).'],
+  ['red','Red de actores y centralidad','Representa qué actores aparecen juntos en los mismos hechos o relatos. El grado es la cantidad de actores distintos con los que se vincula cada uno; el grado ponderado suma cuántas veces aparecen juntos; la intermediación mide cuánto un actor está en el camino entre otros que no se vinculan directamente: los actores con intermediación alta funcionan como puentes. La red muestra co-apariciones, no necesariamente alianzas.'],
   ['keyness','Palabras características (log-verosimilitud)','Las palabras que un grupo de textos usa proporcionalmente más que el resto (por ejemplo, las que distinguen a un tópico o a una entrevista). Se miden con la log-verosimilitud (G²), que compara la frecuencia en el grupo con la del resto: con G² mayor que 3,84 la diferencia es significativa (p < 0,05). Muestran de qué se habla en cada grupo, pero no reemplazan la lectura de los textos.'],
   ['rangos','Pruebas de rangos (no paramétricas)','Comparan grupos según la posición (el rango) de cada valor, en lugar del promedio: Mann-Whitney para dos grupos y Kruskal-Wallis para tres o más. No suponen que los datos sigan una distribución normal, por eso convienen con pocos casos, con valores extremos o con escalas ordinales. Informan medianas y rangos medios.'],
   ['pares','Comparaciones de a pares y ajuste de p','Cuando hay tres o más grupos, la prueba general dice si hay alguna diferencia, pero no cuál. Las comparaciones de a pares revisan cada par. Como hacer muchas pruebas aumenta la chance de encontrar diferencias por azar, los p se ajustan: Tukey (supone variabilidades iguales), Games-Howell (no lo supone), Holm o Bonferroni (más conservador). Con pruebas de rangos se usa la prueba de Dunn.'],
@@ -8969,6 +9417,7 @@ function applySession(bundle, mode){
 }
 
 function refreshAllAfterSession(){
+  try{ applyModules(); }catch(e){}
   resetStatusLists();
   addRestoredStatusLines();
   if(Object.keys(datasets).length){ buildUI(); }
