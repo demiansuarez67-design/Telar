@@ -45,6 +45,9 @@
 .ocr-stage svg{position:absolute;inset:0;width:100%;height:100%;cursor:crosshair}
 .ocr-text{border:1px solid var(--line);border-radius:4px;padding:8px 12px;min-height:220px;max-height:46vh;overflow:auto;background:var(--panel);font-size:.9rem;line-height:1.6}
 .ocr-text p{margin:0 0 8px}
+.mode-in-menu{display:none}
+.mode-more{border:1px solid var(--line);border-radius:999px;padding:7px 14px;font:inherit;font-size:.85rem;background:var(--panel);color:var(--ink);cursor:pointer}
+.mode-more.active{background:var(--teal-d);color:#fff;border-color:var(--teal-d)}
 .map-label{background:rgba(255,255,255,.9);border:1px solid #C7D0CD;font-size:11px;padding:1px 5px;box-shadow:none}
 .ocr-low{background:rgba(232,190,60,.35);border-bottom:2px solid #C9A227}
 .help-btn{border:1px solid var(--line);background:var(--panel);color:var(--teal-d);width:22px;height:22px;border-radius:50%;font:600 .78rem/1 inherit;cursor:pointer;padding:0;margin-left:8px;flex:none}
@@ -219,6 +222,7 @@ tbody tr:hover{background:var(--accent-bg)}
     <button type="button" class="main-tab" role="tab" id="tab-codigos" data-panel="codigos" aria-controls="panel-codigos" aria-selected="false" tabindex="-1">Códigos<span class="tab-count" id="tab-count-codigos"></span></button>
     <button type="button" class="main-tab" role="tab" id="tab-biblio" data-panel="biblio" aria-controls="panel-biblio" aria-selected="false" tabindex="-1">Bibliografía<span class="tab-count" id="tab-count-biblio"></span></button>
     <button type="button" class="main-tab" role="tab" id="tab-espec" data-panel="espec" aria-controls="panel-espec" aria-selected="false" tabindex="-1">Especificidades</button>
+    <button type="button" class="main-tab" role="tab" id="tab-mapa" data-panel="mapa" aria-controls="panel-mapa" aria-selected="false" tabindex="-1">Mapa</button>
   </nav>
 
   <div class="main-panel" id="panel-graficos" role="tabpanel" aria-labelledby="tab-graficos">
@@ -231,12 +235,9 @@ tbody tr:hover{background:var(--accent-bg)}
       <button class="mode-btn" data-mode="adv">Modo avanzado</button>
       <button class="mode-btn" data-mode="cross">Tabla cruzada</button>
       <button class="mode-btn" data-mode="quality">Calidad de datos</button>
-      <button class="mode-btn" data-mode="map">Mapa</button>
-      <button class="mode-btn" data-mode="timeline">Línea de tiempo</button>
-      <button class="mode-btn" data-mode="cmp">Comparar grupos</button>
-      <button class="mode-btn" data-mode="reg">Regresión</button>
-      <button class="mode-btn" data-mode="conf">Conflictividad</button>
       <button class="mode-btn" data-mode="net">Red de actores</button>
+      <select id="mode-more" class="mode-more" aria-label="Más análisis"><option value="">Más análisis</option><option value="timeline">Línea de tiempo</option><option value="cmp">Comparar grupos</option><option value="reg">Regresión</option><option value="conf">Conflictividad</option></select>
+      <span class="mode-in-menu"><button class="mode-btn" data-mode="timeline">Línea de tiempo</button><button class="mode-btn" data-mode="cmp">Comparar grupos</button><button class="mode-btn" data-mode="reg">Regresión</button><button class="mode-btn" data-mode="conf">Conflictividad</button></span>
       </div>
       <div class="modebar-opts">
       <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;color:var(--sub);cursor:pointer">
@@ -302,10 +303,7 @@ tbody tr:hover{background:var(--accent-bg)}
       <div id="similar-terms-result"></div>
     </div>
 
-    <div id="map-view" style="display:none">
-      <p class="hint helptext">Mapa esquemático (no es un mapa real con coordenadas satelitales) — ubica los valores de la columna de tipo "Lugar" según las coordenadas cargadas en la configuración del proyecto, con el tamaño del punto proporcional a los registros filtrados.</p>
-      <div id="map-svg-wrap" style="background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:10px"></div>
-    </div>
+    
 
     <div id="timeline-view" style="display:none">
       <p class="hint helptext">Cada punto es un registro en su fecha exacta (no agrupado por año) — sirve para ver agrupamientos dentro de un mismo año que la vista por año no muestra. Necesita que la base tenga una columna de fecha real.</p>
@@ -357,9 +355,10 @@ tbody tr:hover{background:var(--accent-bg)}
     <div id="net-view" style="display:none">
       <p class="hint helptext">Muestra qué actores aparecen juntos en los mismos registros (por ejemplo, varias organizaciones en un mismo conflicto) o en los mismos relatos (palabras clave). Cada punto es un actor y cada línea, una co-aparición. La tabla informa sus medidas de centralidad.</p>
       <div class="adv-controls">
-        <div class="field" style="flex:1"><label>Actores de</label><select id="net-src"></select></div>
+        <div class="field"><label>Actores de</label><select id="net-src"></select></div>
         <div class="field"><label>Vínculos con al menos</label><select id="net-min"><option value="1">1 co-aparición</option><option value="2">2 co-apariciones</option><option value="3">3 co-apariciones</option><option value="5">5 co-apariciones</option></select></div>
       </div>
+      <div id="net-cols-wrap" style="margin:4px 0 10px"><p class="hint" style="margin:0 0 4px">Columnas cuyos valores se vinculan cuando aparecen en el mismo registro (por ejemplo, ORGANIZACIÓN; o ORGANIZACIÓN y LOCALIDAD, para ver en qué localidades actúa cada organización):</p><div id="net-cols" style="display:flex;gap:6px 14px;flex-wrap:wrap"></div></div>
       <div id="net-out"></div>
     </div>
 
@@ -541,7 +540,7 @@ tbody tr:hover{background:var(--accent-bg)}
     <div class="adv-controls">
       <div class="field"><label>A partir de</label><select id="mm-src"></select></div>
       <div class="field" id="mm-term-wrap" style="display:none"><label>Palabra (con * para variantes)</label><input type="text" id="mm-term" placeholder="ej. despid*"></div>
-      <div id="mm-cols-wrap" style="display:none;gap:10px" class="adv-controls"><div class="field"><label>Ramas: categorías de</label><select id="mm-colA"></select></div><div class="field"><label>Hojas: valores de</label><select id="mm-colB"></select></div></div>
+      <div id="mm-cols-wrap" style="display:none;gap:10px" class="adv-controls"><div class="field"><label>Base</label><select id="mm-ds"></select></div><div class="field"><label>Ramas: categorías de</label><select id="mm-colA"></select></div><div class="field"><label>Hojas: valores de</label><select id="mm-colB"></select></div></div>
       <button class="go" id="mm-run" style="align-self:flex-end">Armar el mapa</button>
     </div>
     <div id="mm-out"></div>
@@ -584,6 +583,17 @@ tbody tr:hover{background:var(--accent-bg)}
     <div id="gl-list"></div>
   </section>
   </div>
+  <div class="main-panel" id="panel-mapa" role="tabpanel" aria-labelledby="tab-mapa" hidden>
+    <section class="card">
+      <h2>Mapa</h2>
+      <div class="adv-controls"><div class="field"><label>Base</label><select id="map-ds"></select></div></div>
+      <p class="hint" style="margin:0 0 8px">Se aplican los filtros que tenga la base en la solapa Gráficos. Los lugares se ubican con las coordenadas de ⚙ Configurar proyecto o con columnas de latitud y longitud de la base.</p>
+      <div id="map-view">
+      <p class="hint helptext">Mapa esquemático (no es un mapa real con coordenadas satelitales) — ubica los valores de la columna de tipo "Lugar" según las coordenadas cargadas en la configuración del proyecto, con el tamaño del punto proporcional a los registros filtrados.</p>
+      <div id="map-svg-wrap" style="background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:10px"></div>
+    </div>
+    </section>
+  </div>
 
   <div style="position:fixed;bottom:20px;right:20px;z-index:41">
     <button id="notes-fab-btn" style="border-radius:24px;padding:11px 20px;box-shadow:0 4px 14px rgba(0,0,0,.35);background:var(--panel);border:1px solid var(--line);color:var(--ink);font:inherit;font-size:.88rem;cursor:pointer">📝 Notas</button>
@@ -619,7 +629,7 @@ tbody tr:hover{background:var(--accent-bg)}
 
 <script>
 // ===== Versión de Telar (al publicar una nueva, cambiar acá y en sw.js) =====
-const APP_VERSION = '0.13.0';
+const APP_VERSION = '0.13.1';
 const APP_CHANNEL = 'beta';
 const APP_LABEL = 'Telar ' + APP_VERSION + ' ' + APP_CHANNEL;
 // Dirección del formulario de comentarios (ej. un Formulario de Google). Vacía: se explica cómo configurarla.
@@ -868,9 +878,15 @@ document.getElementById('chk-percent').addEventListener('change', e=>{
 let showTrend = false;
 document.getElementById('cross-xlsx-btn').addEventListener('click', exportCrossXLSX);
 document.getElementById('cmp-run').addEventListener('click', runCompare);
+// "Más análisis": los modos de la lista se abren con sus botones (ocultos), y la lista muestra cuál está activo
+const MENU_MODES = ['timeline','cmp','reg','conf'];
+document.getElementById('map-ds').addEventListener('change', e=>{ if(datasets[e.target.value]){ active = e.target.value; buildUI(); renderMap(); } });
+document.getElementById('mode-more').addEventListener('change', e=>{ const m = e.target.value; if(m) document.querySelector(`#explore .mode-btn[data-mode="${m}"]`).click(); });
+document.querySelectorAll('#explore .mode-btn').forEach(b=>b.addEventListener('click', ()=>{ const sel = document.getElementById('mode-more'); sel.value = MENU_MODES.includes(b.dataset.mode) ? b.dataset.mode : ''; sel.classList.toggle('active', !!sel.value); }));
 document.getElementById('wa-run').addEventListener('click', runWords);
 document.getElementById('mm-run').addEventListener('click', ()=>runMind(false));
 document.getElementById('mm-src').addEventListener('change', setupMindControls);
+document.getElementById('mm-ds').addEventListener('change', setupMindControls);
 document.getElementById('mm-term').addEventListener('keydown', e=>{ if(e.key==='Enter') runMind(false); });
 ['net-src','net-min'].forEach(id=>document.getElementById(id).addEventListener('change', renderNet));
 ['conf-gran','conf-actor','conf-form'].forEach(id=>document.getElementById(id).addEventListener('change', renderConf));
@@ -3667,7 +3683,9 @@ function fmtFecha(iso){ const m = String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2}
 
 // --- Seudónimos: reemplazo de nombres en todo lo que se muestra, se exporta o va al informe ---
 let usePseudonyms = true;
-function pseudoMap(iv){ return (iv && iv.pseudo || []).filter(p=>p.on && p.orig && p.orig.trim() && p.alias); }
+function pseudoMap(iv){ // cada fila puede tener variantes del mismo nombre ("Ricardo", "Sastre"), unidas a mano
+  return (iv && iv.pseudo || []).filter(p=>p.on && p.orig && p.orig.trim() && p.alias).flatMap(p=>[{orig: p.orig, alias: p.alias}].concat((p.variants||[]).filter(v=>v && v.trim()).map(v=>({orig: v, alias: p.alias}))));
+}
 // patrón que acepta el nombre en mayúsculas o minúsculas, letra por letra (sin usar la bandera "i", que alteraría \p{Lu})
 function ciPattern(str){ return [...str].map(ch=>{ const lo = ch.toLowerCase(), up = ch.toUpperCase(); if(lo!==up) return '['+lo+up+']'; return ch.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }).join(''); }
 function applyPseudo(iv, text){
@@ -3808,7 +3826,7 @@ function openPseudonymDialog(key){
   const iv = interviews[key]; if(!iv) return;
   const n = Object.keys(interviews).indexOf(key)+1;
   const rows = (iv.pseudo||[]).slice();
-  const has = o=>rows.some(r=>normColName(r.orig)===normColName(o));
+  const has = o=>rows.some(r=>normColName(r.orig)===normColName(o) || (r.variants||[]).some(v=>normColName(v)===normColName(o)));
   if(iv.meta.nombre){
     const parts = iv.meta.nombre.split(/\s+/).filter(Boolean);
     [[iv.meta.nombre, 'Entrevistado/a '+n]].concat(parts.length>1 ? [[parts[0], 'Entrevistado/a '+n], [parts.slice(1).join(' '), 'Entrevistado/a '+n]] : []).forEach(([o,a])=>{ if(!has(o)) rows.push({orig:o, alias:a, on:true}); });
@@ -3825,17 +3843,30 @@ function openPseudonymDialog(key){
     const twin = sameAs(nm);
     rows.push({orig:nm, alias: twin ? twin.alias : 'Persona '+String.fromCharCode(65+(letter++%26)), on:false, suggested:true});
   });
-  const rowHtml = (r,i)=>`<tr><td><input type="checkbox" class="ps-on" ${r.on?'checked':''}></td><td><input type="text" class="ps-orig" value="${esc(r.orig)}" style="min-width:200px"></td><td><input type="text" class="ps-alias" value="${esc(r.alias)}" style="min-width:160px"></td></tr>`;
+  const rowHtml = (r,i)=>`<tr data-variants="${esc(JSON.stringify(r.variants||[]))}"><td><input type="checkbox" class="ps-sel" title="Seleccionar para unir"></td><td><input type="checkbox" class="ps-on" ${r.on?'checked':''}></td><td><input type="text" class="ps-orig" value="${esc(r.orig)}" style="min-width:200px">${(r.variants||[]).length ? `<div class="hint" style="margin:2px 0 0;font-size:.75rem">También: ${r.variants.map(esc).join(', ')} · <button type="button" class="gl-link ps-split">separar</button></div>` : ''}</td><td><input type="text" class="ps-alias" value="${esc(r.alias)}" style="min-width:160px"></td></tr>`;
   showModal('🕶 Seudónimos — '+iv.label, `
     <p class="hint">Los nombres marcados se reemplazan por su seudónimo en todo lo que se muestra, se exporta o se agrega al informe (el documento original no se modifica). Abajo aparecen, sin marcar, otros nombres propios mencionados en la entrevista: marcá los que quieras ocultar.</p>
-    <div class="tablewrap" style="max-height:48vh"><table><thead><tr><th>Aplicar</th><th>Nombre en la transcripción</th><th>Seudónimo</th></tr></thead><tbody id="ps-body">${rows.map(rowHtml).join('')}</tbody></table></div>
+    <div class="tablewrap" style="max-height:48vh"><table><thead><tr><th title="Seleccionar para unir">Unir</th><th>Aplicar</th><th>Nombre en la transcripción</th><th>Seudónimo</th></tr></thead><tbody id="ps-body">${rows.map(rowHtml).join('')}</tbody></table></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
       <button class="mini-export" id="ps-add">+ Agregar un nombre</button>
+      <button class="mini-export" id="ps-merge" title="Marcá en la columna Unir las filas que son la misma persona (por ejemplo, Ricardo Sastre, Ricardo y Sastre)">Unir seleccionados en una fila</button>
       <button class="go" id="ps-ok">Guardar</button>
     </div>`, {wide:true});
   document.getElementById('ps-add').onclick = ()=>{ document.getElementById('ps-body').insertAdjacentHTML('beforeend', rowHtml({orig:'', alias:'', on:true})); };
+  const readRow = tr=>({on: tr.querySelector('.ps-on').checked, orig: tr.querySelector('.ps-orig').value.trim(), alias: tr.querySelector('.ps-alias').value.trim(), variants: JSON.parse(tr.dataset.variants||'[]')});
+  const body = document.getElementById('ps-body');
+  // unir: las filas marcadas pasan a ser una sola, con el nombre más largo como principal y los demás como variantes
+  document.getElementById('ps-merge').onclick = ()=>{
+    const sel = [...body.querySelectorAll('tr')].filter(tr=>tr.querySelector('.ps-sel').checked);
+    if(sel.length<2){ alert('Marcá en la columna "Unir" al menos dos filas que correspondan a la misma persona.'); return; }
+    const rs = sel.map(readRow).filter(r=>r.orig), main = rs.slice().sort((a,b)=>b.orig.length-a.orig.length)[0];
+    const merged = {orig: main.orig, alias: main.alias || rs.map(r=>r.alias).find(Boolean) || '', on: rs.some(r=>r.on), variants: [...new Set(rs.flatMap(r=>[r.orig].concat(r.variants)).filter(v=>normColName(v)!==normColName(main.orig)))]};
+    sel[0].insertAdjacentHTML('beforebegin', rowHtml(merged)); sel.forEach(tr=>tr.remove());
+  };
+  body.addEventListener('click', e=>{ const b = e.target.closest('.ps-split'); if(!b) return; const tr = b.closest('tr'), r = readRow(tr);
+    tr.insertAdjacentHTML('beforebegin', [Object.assign({}, r, {variants: []})].concat(r.variants.map(v=>({orig: v, alias: r.alias, on: r.on}))).map(rowHtml).join('')); tr.remove(); });
   document.getElementById('ps-ok').onclick = ()=>{
-    iv.pseudo = [...document.querySelectorAll('#ps-body tr')].map(tr=>({on: tr.querySelector('.ps-on').checked, orig: tr.querySelector('.ps-orig').value.trim(), alias: tr.querySelector('.ps-alias').value.trim()})).filter(r=>r.orig && r.alias);
+    iv.pseudo = [...document.querySelectorAll('#ps-body tr')].map(readRow).filter(r=>r.orig && r.alias).map(r=>{ if(!r.variants.length) delete r.variants; return r; });
     logEvent('privacidad', `Entrevista «${applyPseudo(iv, iv.label)}»: ${pseudoMap(iv).length} seudónimo(s) aplicados.`);
     closeModal(false);
     renderInterviewsUI(); renderCodesUI(); persistSession();
@@ -5015,10 +5046,14 @@ function svgDownload(svg, name){ universalDownload(name+'.svg', new Blob([new XM
 const GRAPH_COLORS = ['#2F6B6E','#B5533C','#5E8C61','#8A6A9C','#C28E2B','#3D7EA6','#A2574F','#6B7F3A','#7A5C3E','#4F6D8A'];
 /* ===== REDES DE ACTORES (inicio) ===== */
 // Unidades: cada conflicto (fila de la base) o cada relato, con los actores que aparecen en él
+// Unidades: cada registro de la base (con los actores de una o varias columnas) o cada relato (palabras clave)
+let netTypes = new Map(); // actor → columna de la que viene (para colorear)
 function netUnits(src){
+  netTypes = new Map();
   if(src==='__kw__') return Object.values(qualDocs).flatMap(d=>d.entries.map(e=>[...new Set((e.keywords||[]).map(k=>String(k).trim()).filter(Boolean))]));
   const ds = datasets[active]; if(!ds) return [];
-  return getFiltered().map(r=>[...new Set(getCategories(ds, r, src).filter(v=>v && v!=='(sin dato)'))]);
+  const cols = Array.isArray(src) ? src : [src];
+  return getFiltered().map(r=>[...new Set(cols.flatMap(c=>getCategories(ds, r, c).filter(v=>v && v!=='(sin dato)' && v!=='(ninguna)').map(v=>{ if(!netTypes.has(v)) netTypes.set(v, c); return v; })))]);
 }
 function netBuild(units, minW){
   const n = new Map(), pair = new Map();
@@ -5057,38 +5092,52 @@ function netLayout(g, W, H){
   const xs = pos.map(p=>p.x), ys = pos.map(p=>p.y), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
   return pos.map(p=>({x: 70 + (p.x-x0)/Math.max(1,x1-x0)*(W-140), y: 40 + (p.y-y0)/Math.max(1,y1-y0)*(H-80)}));
 }
-function netSvg(g, cen){
+function netSvg(g, cen, colorOf){
   const W = 760, H = 520, pos = netLayout(g, W, H), idx = new Map(g.nodes.map((x,i)=>[x.id, i]));
   const maxN = Math.max(...g.nodes.map(x=>x.n)), maxW = Math.max(...g.edges.map(e=>e.w)), btw = new Map(cen.map(c=>[c.id, c.btw])), maxB = Math.max(1e-9, ...cen.map(c=>c.btw));
   const r = x=>6 + 16*Math.sqrt(x.n/maxN);
   const edges = g.edges.map(e=>{ const a = pos[idx.get(e.a)], b = pos[idx.get(e.b)]; return `<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="#7A8A8E" stroke-opacity="0.55" stroke-width="${(1 + 5*e.w/maxW).toFixed(1)}"><title>${esc(e.a)} – ${esc(e.b)}: ${e.w}</title></line>`; }).join('');
-  const nodes = g.nodes.map((x,i)=>{ const p = pos[i], hub = btw.get(x.id)/maxB; return `<g><circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${r(x).toFixed(1)}" fill="${hub>0.5 ? '#B5533C' : '#2F6B6E'}" stroke="#fff" stroke-width="1.5"><title>${esc(x.id)}: ${x.n}</title></circle><text x="${p.x.toFixed(1)}" y="${(p.y - r(x) - 4).toFixed(1)}" text-anchor="middle" font-size="11" font-family="IBM Plex Sans, Arial, sans-serif" fill="#16232E" paint-order="stroke" stroke="#fff" stroke-width="3">${esc(x.id.length>28 ? x.id.slice(0,27)+'…' : x.id)}</text></g>`; }).join('');
+  const nodes = g.nodes.map((x,i)=>{ const p = pos[i], hub = btw.get(x.id)/maxB; return `<g><circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${r(x).toFixed(1)}" fill="${colorOf ? colorOf(x.id) : (hub>0.5 ? '#B5533C' : '#2F6B6E')}" stroke="${colorOf && hub>0.5 ? '#B5533C' : '#fff'}" stroke-width="${colorOf && hub>0.5 ? 3.5 : 1.5}"><title>${esc(x.id)}: ${x.n}</title></circle><text x="${p.x.toFixed(1)}" y="${(p.y - r(x) - 4).toFixed(1)}" text-anchor="middle" font-size="11" font-family="IBM Plex Sans, Arial, sans-serif" fill="#16232E" paint-order="stroke" stroke="#fff" stroke-width="3">${esc(x.id.length>28 ? x.id.slice(0,27)+'…' : x.id)}</text></g>`; }).join('');
   return `<svg id="net-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;background:#fff;border:1px solid var(--line);border-radius:6px" role="img" aria-label="Red de actores">${edges}${nodes}</svg>`;
 }
+function netCandidateCols(ds){ return catColumns(ds).filter(c=>!isPeriodCol(c) && !['codigo','documento','fragmento'].includes(colRole(ds,c))); }
+function netSelectedCols(){ return [...document.querySelectorAll('#net-cols input:checked')].map(c=>c.value); }
 function setupNetControls(){
   const ds = datasets[active], sel = document.getElementById('net-src'); if(!ds || !sel) return;
-  const pv = sel.value, multis = catColumns(ds).filter(c=>isMultiColumn(ds, c));
-  const hasKw = Object.values(qualDocs).some(d=>d.entries.some(e=>(e.keywords||[]).length>1));
-  sel.innerHTML = multis.map(c=>`<option value="${esc(c)}">${esc(c)} (en cada registro de la base)</option>`).join('') + (hasKw ? '<option value="__kw__">Palabras clave de los relatos (en cada relato)</option>' : '');
-  if([...sel.options].some(o=>o.value===pv)) sel.value = pv;
+  const hasKw = Object.values(qualDocs).some(d=>d.entries.some(e=>(e.keywords||[]).length>1)), pv = sel.value;
+  sel.innerHTML = '<option value="base">Registros de la base</option>' + (hasKw ? '<option value="__kw__">Palabras clave de los relatos (en cada relato)</option>' : '');
+  sel.value = [...sel.options].some(o=>o.value===pv) ? pv : 'base';
+  const box = document.getElementById('net-cols'), cand = netCandidateCols(ds);
+  if(box.dataset.ds!==active){ // primera vez con esta base: se sugieren las columnas de actores
+    box.dataset.ds = active;
+    const multis = cand.filter(c=>isMultiColumn(ds, c)), org = cand.find(c=>/organiz|actor|sindic|gremio|protagon|empresa/i.test(c));
+    const pre = multis.length ? multis.slice(0,1) : org ? [org] : cand.slice(0,1);
+    box.innerHTML = cand.map(c=>`<label class="chk-opt"><input type="checkbox" value="${esc(c)}" ${pre.includes(c) ? 'checked' : ''}> ${esc(c)}${isMultiColumn(ds,c) ? ' <span class="hint" style="margin:0">(varios por registro)</span>' : ''}</label>`).join('');
+    box.querySelectorAll('input').forEach(i=>i.addEventListener('change', renderNet));
+  }
+  document.getElementById('net-cols-wrap').style.display = sel.value==='base' ? '' : 'none';
 }
 function renderNet(){
   setupNetControls();
-  const out = document.getElementById('net-out'), src = document.getElementById('net-src').value;
-  if(!src){ out.innerHTML = '<p class="empty">Para armar una red hace falta una columna con varios actores por registro (por ejemplo, varias organizaciones en un mismo conflicto, separadas por coma) o relatos con varias palabras clave.</p>'; return; }
+  const out = document.getElementById('net-out'), mode = document.getElementById('net-src').value, ds = datasets[active];
+  const cols = mode==='base' ? netSelectedCols() : [];
+  if(mode==='base' && !cols.length){ out.innerHTML = '<p class="empty">Marcá una o más columnas de actores (por ejemplo, ORGANIZACIÓN).</p>'; return; }
+  const src = mode==='base' ? cols : '__kw__';
   const minW = Math.max(1, +document.getElementById('net-min').value || 1);
   const g = netBuild(netUnits(src), minW);
-  if(!g.edges.length){ out.innerHTML = `<p class="empty">No hay actores que aparezcan juntos${minW>1 ? ' al menos '+minW+' veces' : ''}.</p>`; return; }
+  if(!g.edges.length){ out.innerHTML = `<p class="empty">No hay actores que aparezcan juntos${minW>1 ? ' al menos '+minW+' veces' : ''}.${mode==='base' && cols.length===1 && !isMultiColumn(ds, cols[0]) ? ` "${esc(cols[0])}" tiene un solo valor por registro: marcá también otra columna (por ejemplo, la localidad o la forma de protesta) para vincular sus valores con ella, o usá una columna con varios actores por registro.` : ''}</p>`; return; }
   if(g.nodes.length>80){ const keep = new Set(g.nodes.slice(0,80).map(x=>x.id)); g.nodes = g.nodes.filter(x=>keep.has(x.id)); g.edges = g.edges.filter(e=>keep.has(e.a) && keep.has(e.b)); g.trimmed = true; }
   const cen = netCentrality(g).sort((a,b)=>b.btw-a.btw || b.wdeg-a.wdeg);
-  const srcName = src==='__kw__' ? 'palabras clave de los relatos' : `"${src}"`;
+  const srcName = src==='__kw__' ? 'palabras clave de los relatos' : cols.map(c=>`"${c}"`).join(' y ');
+  const typeColor = c=>GRAPH_COLORS[Math.max(0, cols.indexOf(c)) % GRAPH_COLORS.length];
   const top = cen.slice(0,3).map(c=>c.id);
   out.innerHTML = `<p style="margin:6px 0">Red de actores que aparecen juntos (${srcName}): <strong>${g.nodes.length}</strong> actores, <strong>${g.edges.length}</strong> vínculos, sobre ${g.units} ${src==='__kw__' ? 'relatos' : 'registros'}. El tamaño de cada punto indica en cuántos aparece; el grosor de cada línea, cuántas veces aparecen juntos. En terracota, los actores que más conectan a otros (intermediación alta).${g.isolated ? ` ${g.isolated} actor(es) no aparecen junto a otros y no se muestran.` : ''}${g.trimmed ? ' Se muestran los 80 actores más frecuentes.' : ''}</p>
-    ${netSvg(g, cen)}
+    ${cols.length>1 ? `<p class="hint" style="margin:4px 0">Colores: ${cols.map(c=>`<span style="color:${typeColor(c)};font-weight:600">● ${esc(c)}</span>`).join(' · ')}. Con borde terracota, los actores que más conectan a otros.</p>` : ''}
+    ${netSvg(g, cen, cols.length>1 ? id=>typeColor(netTypes.get(id)) : null)}
     <p class="hint" style="margin:8px 0">Los actores con mayor intermediación (${top.map(esc).join(', ')}) son los que más conectan a otros que no aparecen juntos entre sí. ${glLink('red','¿Qué miden estas medidas?')}</p>
-    <div class="tablewrap"><table><thead><tr><th>Actor</th><th>Apariciones</th><th>Vínculos (grado)</th><th>Co-apariciones (grado ponderado)</th><th>Intermediación</th></tr></thead><tbody>${cen.map(c=>`<tr><td>${esc(c.id)}</td><td>${c.n}</td><td>${c.degree}</td><td>${c.wdeg}</td><td>${fmtN(c.btw,3)}</td></tr>`).join('')}</tbody></table></div>
+    <div class="tablewrap"><table><thead><tr><th>Actor</th>${cols.length>1 ? '<th>Columna</th>' : ''}<th>Apariciones</th><th>Vínculos (grado)</th><th>Co-apariciones (grado ponderado)</th><th>Intermediación</th></tr></thead><tbody>${cen.map(c=>`<tr><td>${esc(c.id)}</td>${cols.length>1 ? `<td>${esc(netTypes.get(c.id)||'')}</td>` : ''}<td>${c.n}</td><td>${c.degree}</td><td>${c.wdeg}</td><td>${fmtN(c.btw,3)}</td></tr>`).join('')}</tbody></table></div>
     <div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="mini-export" id="net-report">📌 Agregar al informe</button><button type="button" class="mini-export" id="net-png">⭳ Imagen</button><button type="button" class="mini-export" id="net-xlsx">⭳ Excel</button></div>`;
-  const title = `Red de actores: ${srcName}`, note = `Red de co-aparición de actores en ${src==='__kw__' ? 'los mismos relatos' : 'los mismos registros de "'+datasets[active].label+'"'}${minW>1 ? ' (vínculos de al menos '+minW+' co-apariciones)' : ''}. Intermediación normalizada (Brandes).`;
+  const title = `Red de actores: ${srcName}`, note = `Red de co-aparición de actores en ${src==='__kw__' ? 'los mismos relatos' : 'los mismos registros de "'+ds.label+'"'}${minW>1 ? ' (vínculos de al menos '+minW+' co-apariciones)' : ''}. Intermediación normalizada (Brandes).`;
   logEvent('modelos', `${title}: ${g.nodes.length} actores y ${g.edges.length} vínculos. ${note}`);
   const svg = ()=>document.getElementById('net-svg');
   document.getElementById('net-png').onclick = async ()=>{ const u = await svgToPngDataURL(svg()); const a = document.createElement('a'); a.href = u; a.download = xlsxName('red_actores').replace(/\.xlsx$/,'') + '.png'; a.click(); };
@@ -5099,8 +5148,14 @@ function renderNet(){
 
 /* ===== MAPAS MENTALES (inicio) ===== */
 // Árbol {label, n, children}: se arma a partir del sistema de códigos, los relatos, una palabra o una base de datos
+function mindCodeCounts(){ // códigos asignados en Telar + códigos de matrices importadas (Atlas.ti, NVivo, MAXQDA)
+  const u = Object.assign({}, codeUsage());
+  Object.values(datasets).forEach(ds=>{ const cc = ds.columns.filter(c=>colRole(ds,c)==='codigo'); if(!cc.length) return;
+    ds.rows.forEach(r=>cc.forEach(c=>getCategories(ds, r, c).forEach(code=>{ if(code && code!=='(sin dato)' && code!=='(ninguna)'){ const k = String(code).replace(/\s*::\s*/g, '\\'); u[k] = (u[k]||0)+1; } }))); });
+  return u;
+}
 function mindFromCodes(){
-  const u = codeUsage(), root = {label: 'Sistema de códigos', children: []};
+  const u = mindCodeCounts(), root = {label: 'Sistema de códigos', children: []};
   Object.entries(u).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([path, n])=>{
     let node = root; path.split('\\').forEach((part, i, arr)=>{ let ch = node.children.find(c=>c.label===part); if(!ch){ ch = {label: part, n: 0, children: []}; node.children.push(ch); } if(i===arr.length-1) ch.n += n; node = ch; });
   });
@@ -5124,8 +5179,8 @@ function mindFromWord(term){
   return {label: term, sentences: sents.length, children: top.map(([w, n])=>{ const c2 = new Map(); sents.filter(ws=>ws.includes(w)).forEach(ws=>new Set(ws).forEach(x=>{ if(x!==w) c2.set(x, (c2.get(x)||0)+1); }));
     return {label: w, n, children: [...c2.entries()].filter(e=>e[1]>=2).sort((a,b)=>b[1]-a[1] || a[0].localeCompare(b[0])).slice(0, 3).map(([x,n2])=>({label: x, n: n2, children: []}))}; })};
 }
-function mindFromBase(colA, colB){
-  const ds = datasets[active], rows = getFiltered(), m = new Map();
+function mindFromBase(colA, colB, key){
+  const ds = datasets[key || active], rows = (key && key!==active) ? ds.rows : getFiltered(), m = new Map();
   rows.forEach(r=>{ const as = getCategories(ds, r, colA).filter(v=>v!=='(sin dato)'), bs = getCategories(ds, r, colB).filter(v=>v!=='(sin dato)');
     as.forEach(a=>{ if(!m.has(a)) m.set(a, {n:0, b:new Map()}); const x = m.get(a); x.n++; bs.forEach(b=>x.b.set(b, (x.b.get(b)||0)+1)); }); });
   return {label: ds.label, children: [...m.entries()].sort((a,b)=>b[1].n-a[1].n).slice(0, 10).map(([a, x])=>({label: a, n: x.n, children: [...x.b.entries()].sort((p,q)=>q[1]-p[1]).slice(0, 5).map(([b,n])=>({label: b, n, children: []}))}))};
@@ -5155,19 +5210,22 @@ function mindSvg(root){
   nodes += `<circle cx="${cx}" cy="${cy}" r="34" fill="#16232E"/>` + `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-size="13" font-weight="700" font-family="Source Serif 4, Georgia, serif" fill="#fff">${esc(root.label.length>16 ? root.label.slice(0,15)+'…' : root.label)}</text>`;
   return `<svg id="mind-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;background:#fff;border:1px solid var(--line);border-radius:6px" role="img" aria-label="Mapa mental: ${esc(root.label)}">${links}${nodes}</svg>`;
 }
+function mindBases(){ return Object.keys(datasets).filter(k=>catColumns(datasets[k]).filter(c=>colRole(datasets[k],c)!=='codigo' && colRole(datasets[k],c)!=='documento').length>=2); }
 function setupMindControls(){
-  const src = document.getElementById('mm-src').value, ds = datasets[active];
+  const src = document.getElementById('mm-src').value, dsel = document.getElementById('mm-ds');
+  if(src==='base'){ const keys = mindBases(), pv = dsel.value; dsel.innerHTML = keys.map(k=>`<option value="${esc(k)}">${esc(datasets[k].label)}</option>`).join(''); dsel.value = keys.includes(pv) ? pv : (keys.includes(active) ? active : keys[0]); }
+  const ds = datasets[dsel.value];
   document.getElementById('mm-term-wrap').style.display = src==='word' ? '' : 'none';
   document.getElementById('mm-cols-wrap').style.display = src==='base' ? '' : 'none';
-  if(src==='base' && ds){ ['mm-colA','mm-colB'].forEach((id,i)=>{ const s = document.getElementById(id), pv = s.value, cols = catColumns(ds); s.innerHTML = cols.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join(''); if([...s.options].some(o=>o.value===pv)) s.value = pv; else if(cols[i]) s.value = cols[i]; }); }
+  if(src==='base' && ds){ ['mm-colA','mm-colB'].forEach((id,i)=>{ const s = document.getElementById(id), pv = s.value, cols = catColumns(ds).filter(c=>colRole(ds,c)!=='codigo' && colRole(ds,c)!=='documento'); s.innerHTML = cols.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join(''); if([...s.options].some(o=>o.value===pv)) s.value = pv; else if(cols[i]) s.value = cols[i]; }); }
 }
 function renderMindUI(){
   const sec = document.getElementById('mind-section'); if(!sec) return;
   const opts = [];
-  if(Object.keys(codeUsage()).length) opts.push(['codes','Sistema de códigos']);
+  if(Object.keys(mindCodeCounts()).length) opts.push(['codes','Sistema de códigos']);
   if(Object.values(qualDocs).some(d=>d.entries.some(e=>(e.topicos||[]).length))) opts.push(['topics','Relatos: tópicos y sus actores']);
   if(Object.values(qualDocs).some(d=>d.entries.length) || Object.keys(interviews).length) opts.push(['word','Una palabra y lo que la rodea']);
-  if(datasets[active] && catColumns(datasets[active]).length>=2) opts.push(['base','Base de datos: dos columnas']);
+  if(mindBases().length) opts.push(['base','Base de datos: dos columnas']);
   sec.style.display = opts.length ? '' : 'none'; if(!opts.length) return;
   const sel = document.getElementById('mm-src'), pv = sel.value; sel.innerHTML = opts.map(([v,l])=>`<option value="${v}">${l}</option>`).join(''); if(opts.some(o=>o[0]===pv)) sel.value = pv;
   setupMindControls();
@@ -5181,7 +5239,7 @@ function runMind(keepCollapsed){
   else if(src==='word'){ const term = document.getElementById('mm-term').value.trim(); if(!term){ out.innerHTML = '<p class="empty">Escribí una palabra (con * para incluir variantes: "despid*").</p>'; return; }
     root = mindFromWord(term); desc = `"${term}" en ${root.sentences} oraciones de relatos y entrevistas: cada rama es una palabra que aparece en las mismas oraciones (entre paréntesis, en cuántas), y sus hojas, las palabras que acompañan a ambas.`; }
   else { const a = document.getElementById('mm-colA').value, b = document.getElementById('mm-colB').value; if(!a || !b || a===b){ out.innerHTML = '<p class="empty">Elegí dos columnas distintas.</p>'; return; }
-    root = mindFromBase(a, b); desc = `"${datasets[active].label}": cada rama es una categoría de "${a}" (entre paréntesis, los registros filtrados) con los valores más frecuentes de "${b}".`; }
+    const dk = document.getElementById('mm-ds').value; root = mindFromBase(a, b, dk); desc = `"${datasets[dk].label}": cada rama es una categoría de "${a}" (entre paréntesis, ${dk===active ? 'los registros filtrados' : 'los registros'}) con los valores más frecuentes de "${b}".`; }
   if(!root.children.length){ out.innerHTML = '<p class="empty">No hay contenido para armar el mapa con esta fuente.</p>'; return; }
   lastMind = {root, desc, src};
   out.innerHTML = `<p class="hint" style="margin:6px 0">${esc(desc)} Tocá una rama para plegarla o desplegarla.</p>${mindSvg(root)}
@@ -5969,7 +6027,7 @@ function moduleOn(k){ return !(project.modules && project.modules[k]===false); }
 function applyModules(){
   MODULES.forEach(([k,,tab])=>{ if(tab){ const b = document.getElementById(tab); if(b) b.hidden = !moduleOn(k); } });
   const modeBtn = m=>document.querySelector(`#explore .mode-btn[data-mode="${m}"]`);
-  [['conf','conflicto'],['net','conflicto'],['cmp','encuesta'],['reg','encuesta']].forEach(([m,k])=>{ const b = modeBtn(m); if(b) b.hidden = !moduleOn(k); });
+  [['conf','conflicto'],['net','conflicto'],['cmp','encuesta'],['reg','encuesta']].forEach(([m,k])=>{ const b = modeBtn(m); if(b) b.hidden = !moduleOn(k); const o = document.querySelector(`#mode-more option[value="${m}"]`); if(o) o.hidden = !moduleOn(k); });
   const cur = document.querySelector('.main-tab[aria-selected="true"]'); if(cur && cur.hidden) showMainPanel('graficos');
   const am = document.querySelector('#explore .mode-btn.active'); if(am && am.hidden && modeBtn('quick')) modeBtn('quick').click();
 }
@@ -6186,9 +6244,10 @@ function collapseAtStartup(){
 }
 
 /* --- Solapas principales: Gráficos / Texto / Bibliografía --- */
-const MAIN_PANELS = ['graficos','texto','entrevistas','codigos','biblio','espec'];
+const MAIN_PANELS = ['graficos','texto','entrevistas','codigos','biblio','espec', 'mapa'];
 function showMainPanel(id, opts={}){
   if(id==='codigos') setTimeout(()=>{ renderWordsUI(); renderMindUI(); }, 0);
+  if(id==='mapa') setTimeout(()=>{ fillMapDs(); renderMap(); }, 0);
   if(!MAIN_PANELS.includes(id)) id = 'graficos';
   MAIN_PANELS.forEach(p=>{
     const on = p===id;
@@ -7118,7 +7177,6 @@ document.querySelectorAll('#explore .mode-btn').forEach(b=>{ // solo los modos d
     document.getElementById('adv-view').style.display = m==='adv' ? 'block':'none';
     document.getElementById('cross-view').style.display = m==='cross' ? 'block':'none';
     document.getElementById('quality-view').style.display = m==='quality' ? 'block':'none';
-    document.getElementById('map-view').style.display = m==='map' ? 'block':'none';
     document.getElementById('timeline-view').style.display = m==='timeline' ? 'block':'none';
     document.getElementById('cmp-view').style.display = m==='cmp' ? 'block':'none';
     document.getElementById('reg-view').style.display = m==='reg' ? 'block':'none';
@@ -7126,7 +7184,6 @@ document.querySelectorAll('#explore .mode-btn').forEach(b=>{ // solo los modos d
     document.getElementById('conf-view').style.display = m==='conf' ? 'block':'none';
     if(m==='cross') renderCross();
     if(m==='quality') renderQuality();
-    if(m==='map') renderMap();
     if(m==='timeline') renderTimeline();
     if(m==='net') renderNet();
     if(m==='conf') renderConf();
@@ -7925,7 +7982,7 @@ async function renderMap(){
   const seq = ++mapRenderSeq; // solo cuenta el último pedido de dibujo
   const R = mapPoints(ds); if(R.error){ wrap.innerHTML = '<p class="empty">'+esc(R.error)+'</p>'; return; }
   lastMapPoints = R;
-  if(document.getElementById('map-view').style.display==='none'){ renderMapSchematic(R.points); return; } // oculto: el interactivo se arma al mostrarlo
+  if(document.getElementById('panel-mapa').hidden){ renderMapSchematic(R.points); return; } // solapa oculta: el interactivo se arma al abrirla
   try{ await loadMapLibs(); }catch(e){ if(seq===mapRenderSeq) renderMapSchematic(R.points); return; }
   if(seq!==mapRenderSeq) return;
   if(leafletMap){ try{ leafletMap.remove(); }catch(e){} leafletMap = null; osmLayer = null; }
@@ -7956,6 +8013,11 @@ async function renderMap(){
   document.getElementById('map-report').onclick = async ()=>{ const u = await svgToPngDataURL(mapStaticSvg(R.points)); addToReport({type:'chart', title, imageDataURL: u, citation: `Registros por lugar (${R.how}). ${modelNote(ds, '')} Cartografía: Natural Earth. Elaborado con "${APP_LABEL}" el ${new Date().toLocaleString('es-AR')}.`}); };
 }
 // imagen estática del mapa (para el informe y la descarga), con la misma cartografía
+function fillMapDs(){
+  const sel = document.getElementById('map-ds'), keys = Object.keys(datasets);
+  sel.innerHTML = keys.length ? keys.map(k=>`<option value="${esc(k)}">${esc(datasets[k].label)}</option>`).join('') : '<option value="">(sin bases)</option>';
+  if(keys.includes(active)) sel.value = active;
+}
 function mapStaticSvg(points){
   const lats = points.map(p=>p.lat), lons = points.map(p=>p.lon);
   let la0 = Math.min(...lats), la1 = Math.max(...lats), lo0 = Math.min(...lons), lo1 = Math.max(...lons);
