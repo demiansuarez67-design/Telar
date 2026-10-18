@@ -46,6 +46,11 @@
 .ocr-text{border:1px solid var(--line);border-radius:4px;padding:8px 12px;min-height:220px;max-height:46vh;overflow:auto;background:var(--panel);font-size:.9rem;line-height:1.6}
 .ocr-text p{margin:0 0 8px}
 .mode-in-menu{display:none}
+.ex-table td{vertical-align:top}.ex-table .ex-text{font-size:.78rem;color:var(--sub);min-width:240px;max-width:300px;white-space:normal}
+.ex-table .ex-text-inner{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.ex-val{width:100%;min-width:110px;font:inherit;font-size:.8rem;padding:3px 5px;border:1px solid var(--line);border-radius:4px}
+.ex-src{display:inline-block;padding:1px 8px;border-radius:999px;font-size:.75rem;margin-right:4px;border:1px solid var(--line)}
+.ex-texto{background:rgba(47,107,110,.13)}.ex-base{background:rgba(194,142,43,.16)}.ex-habitual{background:rgba(120,130,135,.12)}.ex-ninguno{background:#fff;border-style:dashed}.ex-manual{background:rgba(94,140,97,.18)}
 td.cell-flag{background:rgba(181,83,60,.13);box-shadow:inset 0 0 0 1px rgba(181,83,60,.55);cursor:help}
 td.cell-flag.mark-vacia{background:rgba(194,142,43,.12);box-shadow:inset 0 0 0 1px rgba(194,142,43,.55)}
 .cell-flag-empty{color:var(--sub);font-style:italic;font-size:.8em}
@@ -55,6 +60,7 @@ tr.row-flag td:first-child{box-shadow:inset 4px 0 0 #B5533C}
 .mode-more{border:1px solid var(--line);border-radius:999px;padding:7px 14px;font:inherit;font-size:.85rem;background:var(--panel);color:var(--ink);cursor:pointer}
 .mode-more.active{background:var(--teal-d);color:#fff;border-color:var(--teal-d)}
 .map-label{background:rgba(255,255,255,.9);border:1px solid #C7D0CD;font-size:11px;padding:1px 5px;box-shadow:none}
+#map-leaflet{position:relative;z-index:0;isolation:isolate}
 .ocr-low{background:rgba(232,190,60,.35);border-bottom:2px solid #C9A227}
 .help-btn{border:1px solid var(--line);background:var(--panel);color:var(--teal-d);width:22px;height:22px;border-radius:50%;font:600 .78rem/1 inherit;cursor:pointer;padding:0;margin-left:8px;flex:none}
 .help-btn[aria-expanded="true"]{background:var(--teal-d);color:#fff;border-color:var(--teal-d)}
@@ -446,7 +452,7 @@ tbody tr:hover{background:var(--accent-bg)}
       <span style="font-size:.78rem;color:var(--sub)">Tópico:</span>
       <span id="qual-topic-list" style="display:flex;gap:10px;flex-wrap:wrap"></span>
     </div>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><button type="button" class="mini-export" id="qual-code-mode" aria-pressed="false">✎ Codificar</button><button type="button" class="mini-export" id="ocr-btn" title="Leer el texto de una foto, una captura de pantalla o un PDF escaneado">📷 Texto desde imagen (OCR)</button><input type="file" id="ocr-input" accept=".jpg,.jpeg,.png,.webp,.pdf,image/*" multiple style="display:none"><span class="hint coding-hint" style="display:none;margin:0;color:var(--teal-d)">Seleccioná una parte de un relato y tocá "＋ Codificar selección", o usá "＋ Código" para el relato completo.</span></div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><button type="button" class="mini-export" id="qual-code-mode" aria-pressed="false">✎ Codificar</button><button type="button" class="mini-export" id="ocr-btn" title="Leer el texto de una foto, una captura de pantalla o un PDF escaneado">📷 Texto desde imagen (OCR)</button><button type="button" class="mini-export" id="ext-btn" title="Proponer registros para una base de datos a partir de los relatos">📋 Pasar relatos a una base</button><input type="file" id="ocr-input" accept=".jpg,.jpeg,.png,.webp,.pdf,image/*" multiple style="display:none"><span class="hint coding-hint" style="display:none;margin:0;color:var(--teal-d)">Seleccioná una parte de un relato y tocá "＋ Codificar selección", o usá "＋ Código" para el relato completo.</span></div>
     <div id="qual-kw-row" style="display:none;align-items:flex-start;gap:10px;margin-bottom:10px;flex-wrap:wrap">
       <span style="font-size:.78rem;color:var(--sub);padding-top:2px">Palabra clave:</span>
       <span id="qual-kw-list" style="display:flex;gap:4px 10px;flex-wrap:wrap;max-height:96px;overflow:auto;flex:1"></span>
@@ -496,6 +502,7 @@ tbody tr:hover{background:var(--accent-bg)}
   </div>
 
   <div class="main-panel" id="panel-codigos" role="tabpanel" aria-labelledby="tab-codigos" hidden>
+  <div class="card" style="padding:12px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button type="button" class="go" id="cd-btn">📖 Codificar con diccionario</button><span class="hint" style="margin:0">Reglas de palabras que proponen códigos en relatos y entrevistas, para revisar y aplicar.</span></div>
   <section class="card" id="cb-section" style="display:none">
     <h2 id="cb-title">Sistema de códigos</h2>
     <p class="hint helptext" data-help-for="cb-title">Los códigos que asignás en las solapas Relatos y Entrevistas (con "✎ Codificar"). Podés ordenarlos en jerarquía (un código dentro de otro), cambiarles el color, escribir su definición —que va al anexo como libro de códigos— o fusionar dos códigos en uno. Los cambios se aplican a todas las codificaciones. El sistema de códigos se guarda en el proyecto y viaja con el perfil, para que un equipo use los mismos códigos.</p>
@@ -544,7 +551,7 @@ tbody tr:hover{background:var(--accent-bg)}
     <p class="hint">Frecuencias de palabras, cada palabra en su contexto y palabras características de cada grupo (tópico, año, entrevista, hablante), sobre los relatos o las entrevistas. Con seudónimos activos, se aplican en todo lo que se muestra o exporta.</p>
     <div class="adv-controls">
       <div class="field"><label>Fuente</label><select id="wa-source"></select></div>
-      <div class="field"><label>Análisis</label><select id="wa-mode"><option value="freq">Palabras más frecuentes</option><option value="kwic">Palabra en contexto</option><option value="keys">Palabras características por grupo</option></select></div>
+      <div class="field"><label>Análisis</label><select id="wa-mode"><option value="freq">Palabras más frecuentes</option><option value="kwic">Palabra en contexto</option><option value="keys">Palabras características por grupo</option><option value="wnet">Red de palabras</option></select></div>
       <div class="field" id="wa-term-wrap" style="display:none"><label>Palabra (con * para variantes: pesc*)</label><input type="text" id="wa-term" placeholder="ej. despido"></div>
       <div class="field" id="wa-group-wrap" style="display:none"><label>Grupos</label><select id="wa-group"></select></div>
       <button class="go" id="wa-run" style="align-self:flex-end">Analizar</button>
@@ -652,7 +659,7 @@ tbody tr:hover{background:var(--accent-bg)}
 
 <script>
 // ===== Versión de Telar (al publicar una nueva, cambiar acá y en sw.js) =====
-const APP_VERSION = '0.13.3';
+const APP_VERSION = '0.14.0';
 const APP_CHANNEL = 'beta';
 const APP_LABEL = 'Telar ' + APP_VERSION + ' ' + APP_CHANNEL;
 // Dirección del formulario de comentarios (ej. un Formulario de Google). Vacía: se explica cómo configurarla.
@@ -901,6 +908,7 @@ document.getElementById('chk-percent').addEventListener('change', e=>{
 let showTrend = false;
 document.getElementById('cross-xlsx-btn').addEventListener('click', exportCrossXLSX);
 document.getElementById('cmp-run').addEventListener('click', runCompare);
+document.getElementById('ext-btn').addEventListener('click', openExtractDialog);
 ['chk-marks','chk-marks-only'].forEach(id=>document.getElementById(id).addEventListener('change', renderTable));
 document.getElementById('marks-xlsx').addEventListener('click', exportMarks);
 // "Más análisis": los modos de la lista se abren con sus botones (ocultos), y la lista muestra cuál está activo
@@ -909,6 +917,7 @@ document.getElementById('map-ds').addEventListener('change', e=>{ if(datasets[e.
 document.getElementById('mode-more').addEventListener('change', e=>{ const m = e.target.value; if(m) document.querySelector(`#explore .mode-btn[data-mode="${m}"]`).click(); });
 document.querySelectorAll('#explore .mode-btn').forEach(b=>b.addEventListener('click', ()=>{ const sel = document.getElementById('mode-more'); sel.value = MENU_MODES.includes(b.dataset.mode) ? b.dataset.mode : ''; sel.classList.toggle('active', !!sel.value); }));
 document.getElementById('wa-run').addEventListener('click', runWords);
+document.getElementById('cd-btn').addEventListener('click', openCodeDictDialog);
 document.getElementById('mm-run').addEventListener('click', ()=>runMind(false));
 document.getElementById('mm-src').addEventListener('change', setupMindControls);
 document.getElementById('mm-ds').addEventListener('change', setupMindControls);
@@ -3355,6 +3364,8 @@ function buildAnnexHtml(){
     if(der.length) h += `<li>Índices construidos: ${der.map(x=>`«${esc(x.name)}» en «${esc(x.base)}» (${x.method==='mean' ? 'promedio' : 'suma'} de ${esc(x.items.join(', '))}; alfa de Cronbach = ${fmtN(x.alpha,3)}, ${x.n} casos con todas las preguntas respondidas)`).join('; ')}. Los casos con alguna pregunta sin responder quedan sin valor en el índice.</li>`; }
   if(methodLog.some(e=>/^Indicadores por /.test(e.text || ''))){ const S = indSettings();
     h += `<li>Indicadores por período: se cuenta la cantidad de registros (o la suma o el promedio de una columna numérica) de cada período; los períodos sin registros cuentan como cero (en promedios, sin dato). Un pico es un período que supera el promedio en más de ${fmtN(S.k,1)} desvíos estándar; un ciclo, un tramo de ${S.minLen} o más períodos seguidos por encima de ${S.ref==='mean' ? 'el promedio' : 'la mediana'}${S.seasonal ? ', ambos calculados sobre la serie ajustada por estacionalidad (valor del período menos el promedio de su mes o trimestre del año, más el promedio general)' : ''}. El índice estacional es el promedio de cada mes (o trimestre) del año dividido por el promedio general. La diversidad de la composición se mide con la equidad de Pielou (entropía de Shannon dividida por su máximo posible).</li>`; }
+  { const ext = Object.values(datasets).filter(d=>d.extracted); if(ext.length) h += `<li>Registros cargados desde relatos con propuesta asistida: ${ext.map(d=>`${d.extracted} en «${esc(d.label)}»`).join('; ')}. Telar propuso cada registro a partir del texto (categorías existentes de la base, sus sinónimos y las asociaciones observadas en la base), y cada propuesta fue revisada y, cuando correspondía, corregida por la persona investigadora antes de sumarse.</li>`; }
+  if(project.dictCoded){ const R = parseCodeDict(project.codeDict); h += `<li>Codificación por diccionario: ${project.dictCoded} fragmentos (oraciones) se codificaron con reglas de palabras, revisadas una por una antes de aplicarse. Reglas usadas: ${R.map(r=>`${esc(r.code)} (${r.pats.map(p=>esc(p.raw)).join(', ')})`).join('; ')}.</li>`; }
   if(methodLog.some(e=>e.kind==='texto')) h += `<li>Análisis de palabras: el texto se divide en palabras (secuencias de letras, en minúsculas, sin lematizar), excluyendo las palabras vacías del español según una lista fija de ${STOP_ES.size} palabras cuando se indica. Las palabras características de cada grupo se identifican por log-verosimilitud (G², Rayson y Garside, 2000), comparando su frecuencia en el grupo con la del resto de los textos; se listan las que aparecen al menos 3 veces y proporcionalmente más en el grupo.</li>`;
   { const nOcr = Object.values(qualDocs).reduce((s,d)=>s+d.entries.filter(e=>e.ocr).length, 0);
     if(nOcr) h += `<li>Transcripción por OCR: ${nOcr} relato(s) se obtuvieron de imágenes (fotos, capturas o PDF escaneados) con ${OCR_ENGINE}, procesando por separado las zonas de texto marcadas en orden de lectura y descartando los renglones de baja confianza; el texto se revisó y corrigió manualmente antes de guardarlo. Cada relato conserva la referencia a su imagen de origen.</li>`; }
@@ -4937,7 +4948,7 @@ function printReport(){
 
 /* ===== ANÁLISIS DE PALABRAS (inicio) ===== */
 // Palabras vacías del español: no aportan contenido por sí mismas (artículos, preposiciones, auxiliares, muletillas)
-const STOP_ES = new Set(('a al algo alguna algunas alguno algunos ante antes aquel aquella aquellas aquellos aqui aquí asi así aun aún bien bueno cada casi como cómo con contra cual cuales cuál cuando cuándo cuanto de del desde donde dónde dos durante e el él ella ellas ello ellos en entonces entre era eran eres es esa esas ese eso esos esta está estaba estaban estado estamos estan están estar estas este esto estos estoy estuvo fue fueron fui ha había habia habían han has hasta hay he hemos hizo hace hacer hacia hacía ir la las le les lo los más mas me mi mí mis mismo misma mismos mismas mucho muchos mucha muchas muy nada ni no nos nosotros nuestra nuestro nuestras nuestros o os otra otras otro otros para pero poco pocos por porque qué que quien quién quienes se sea según ser será si sí siempre sin sino sobre solo sólo son su sus tal también tambien tan tanto te tenemos tener tengo tenía tiene tienen toda todas todo todos tras tu tú tus un una uno unos unas usted ustedes vos y ya yo eh mm ah este esta digamos o sea pues tipo vez veces dijo dice decir digo creo cosa cosas acá ahí allá allí así entonces igual medio onda va van voy vamos ver ser estar sido siendo cual también había fue años año día días').split(' '));
+const STOP_ES = new Set(('a al algo alguna algunas alguno algunos ante antes aquel aquella aquellas aquellos aqui aquí asi así aun aún bien bueno cada casi como cómo con contra cual cuales cuál cuando cuándo cuanto de del desde donde dónde dos durante e el él ella ellas ello ellos en entonces entre era eran eres es esa esas ese eso esos esta está estaba estaban estado estamos estan están estar estas este esto estos estoy estuvo fue fueron fui ha había habia habían han has hasta hay he hemos hizo hace hacer hacia hacía ir la las le les lo los más mas me mi mí mis además ademas luego parte siguiente mismo misma afirmó afirmo señaló señalo expresó expreso expresaron indicó indico explicó explico manifestó manifesto sostuvo aseguró aseguro dijeron sostuvieron agregó agrego mismo misma mismos mismas mucho muchos mucha muchas muy nada ni no nos nosotros nuestra nuestro nuestras nuestros o os otra otras otro otros para pero poco pocos por porque qué que quien quién quienes se sea según ser será si sí siempre sin sino sobre solo sólo son su sus tal también tambien tan tanto te tenemos tener tengo tenía tiene tienen toda todas todo todos tras tu tú tus un una uno unos unas usted ustedes vos y ya yo eh mm ah este esta digamos o sea pues tipo vez veces dijo dice decir digo creo cosa cosas acá ahí allá allí así entonces igual medio onda va van voy vamos ver ser estar sido siendo cual también había fue años año día días').split(' '));
 function waTokens(text, minLen){ return (String(text||'').toLowerCase().match(/\p{L}+/gu) || []).filter(w=>w.length>=minLen); }
 // unidades de texto: relatos o intervenciones de entrevistas, con sus atributos para agrupar
 function waUnits(source){
@@ -5017,6 +5028,7 @@ function waControls(){
   const mode = document.getElementById('wa-mode').value, src = document.getElementById('wa-source').value;
   document.getElementById('wa-term-wrap').style.display = mode==='kwic' ? '' : 'none';
   document.getElementById('wa-group-wrap').style.display = mode==='keys' ? '' : 'none';
+  if(document.getElementById('wa-bi')) document.getElementById('wa-bi').closest('label').style.display = mode==='wnet' ? 'none' : '';
   document.getElementById('wa-opts').style.display = mode==='kwic' ? 'none' : '';
   const gsel = document.getElementById('wa-group'), pv = gsel.value;
   gsel.innerHTML = (WA_GROUPS[src]||[]).map(([k,l])=>`<option value="${k}">${l}</option>`).join(''); if([...gsel.options].some(o=>o.value===pv)) gsel.value = pv;
@@ -5026,6 +5038,18 @@ function runWords(){
   const units = waUnits(src), o = waOptions(), srcName = document.getElementById('wa-source').selectedOptions[0].textContent;
   if(!units.length){ out.innerHTML = '<p class="empty">No hay textos en esta fuente.</p>'; return; }
   const optTxt = `${o.bigrams ? 'pares de palabras' : 'palabras'} de ${o.minLen} letras o más${o.stop ? ', sin palabras vacías' : ''}${o.excl.size ? ', excluyendo: '+[...o.excl].join(', ') : ''}`;
+  if(mode==='wnet'){
+    const {g, sentences, minW: mw} = wordNetwork(units, o, 35, 3);
+    if(!g.edges.length){ out.innerHTML = '<p class="empty">No hay palabras frecuentes que aparezcan juntas al menos 3 veces.</p>'; return; }
+    const cen = netCentrality(g).sort((a,b)=>b.btw-a.btw || b.wdeg-a.wdeg), title = `Red de palabras: ${srcName}`, note = `Co-aparición en las mismas oraciones de las 35 palabras más frecuentes (${o.minLen} letras o más${o.stop ? ', sin palabras vacías' : ''}); vínculos de al menos ${mw} oraciones${mw>3 ? ' (umbral ajustado para que la red sea legible)' : ''}. ${sentences} oraciones.`;
+    out.innerHTML = `<p class="hint">${esc(note)} El tamaño de cada palabra indica en cuántas oraciones aparece; el grosor de la línea, cuántas veces aparecen juntas. En terracota, las que más conectan temas distintos.</p>${netSvg(g, cen).replace('id="net-svg"','id="wnet-svg"')}
+      <div class="tablewrap" style="max-height:260px;overflow:auto;margin-top:8px"><table><thead><tr><th>Palabra</th><th>Oraciones</th><th>Vínculos</th><th>Co-apariciones</th><th>Intermediación</th></tr></thead><tbody>${cen.map(c=>`<tr><td>${esc(c.id)}</td><td>${c.n}</td><td>${c.degree}</td><td>${c.wdeg}</td><td>${fmtN(c.btw,3)}</td></tr>`).join('')}</tbody></table></div>
+      <div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="mini-export" id="wa-report">📌 Agregar al informe</button><button type="button" class="mini-export" id="wa-png">⭳ Imagen</button></div>`;
+    logEvent('texto', `${title}. ${note}`);
+    document.getElementById('wa-png').onclick = async ()=>{ const u = await svgToPngDataURL(document.getElementById('wnet-svg')); const a = document.createElement('a'); a.href = u; a.download = 'red_de_palabras.png'; a.click(); };
+    document.getElementById('wa-report').onclick = async ()=>{ const u = await svgToPngDataURL(document.getElementById('wnet-svg')); addToReport({type:'chart', title, imageDataURL: u, citation: note + ' Calculado con "'+APP_LABEL+'" el '+new Date().toLocaleString('es-AR')+'.'}); };
+    return;
+  }
   let html = '', title = '', aoa = null, logTxt = '';
   if(mode==='freq'){
     const f = waFrequencies(units, o);
@@ -5431,6 +5455,341 @@ function renderConf(){
 }
 /* ===== INDICADORES (fin) ===== */
 
+
+/* ===== DEL RELATO AL REGISTRO: extracción asistida (inicio) ===== */
+// Propone los campos de un registro a partir de un relato, usando las categorías que ya tiene la base
+// (y sinónimos editables). Cada propuesta lleva su nivel de confianza; quien investiga revisa y confirma.
+const EXT_STOP = new Set('de del la las los el y o en por para con sin a al un una que se su sus como'.split(' '));
+function extNorm(s){ return ' ' + String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9ñ]+/g,' ').trim() + ' '; }
+// sinónimos de partida para el registro de conflictos (se pueden ampliar en el diccionario del proyecto)
+const EXT_LEXICON = {
+  'huelga': ['paro', 'paros', 'medida de fuerza', 'dejaron de trabajar', 'cese de actividades', 'cesaron sus tareas', 'no ingresaron'],
+  'piquete': ['piquete', 'piquetes', 'bloque', 'impidieron el ingreso', 'impidiendo el ingreso', 'impidieron la salida', 'impidiendo la salida', 'cortaron el acceso', 'cortaron los accesos'],
+  'movilizacion': ['moviliz', 'marcha', 'marcharon', 'caravana'],
+  'asamblea': ['asamblea'],
+  'ocupacion': ['ocupa', 'tomaron', 'toma de la planta', 'toma de planta'],
+  'acampe': ['acamp'],
+  'retencion de servicios': ['retencion', 'retienen', 'retuvieron'],
+  'lockout': ['lockout', 'lock out', 'cierre patronal'],
+  'corte de ruta': ['corte de ruta', 'cortaron la ruta', 'cortan la ruta'],
+  'planta': ['planta', 'fabrica', 'puertas de la empresa', 'puertas de la firma'],
+  'calle': ['calle', 'calles', 'intendencia', 'municipio', 'legislatura', 'casa de gobierno', 'plaza'],
+  'puerto': ['en el puerto', 'muelle', 'escollera', 'zona portuaria', 'acceso al puerto'],
+  'atraso salarial': ['atraso', 'retraso', 'adeud', 'falta de pago', 'no cobra', 'sin cobrar', 'deuda salarial', 'pago de los salarios', 'pago de haberes', 'aguinaldo', 'quincena'],
+  'despidos': ['despid', 'cesant', 'telegrama'],
+  'cierre de planta': ['cierre', 'quiebra', 'concurso de acreedores', 'cerrar la planta'],
+  'aumento salarial': ['aumento', 'paritari', 'recomposicion salarial', 'mejora salarial'],
+  'subsidio economico': ['subsidio', 'ayuda economica'],
+  'trabajadores': ['autoconvocad', 'grupo de trabajadores'],
+  'trab desocupados': ['desocupad']
+};
+function extComponents(v){ // "Huelga y Piquete (Planta)" → principales [huelga, piquete] y contexto [planta]
+  const s = String(v), ctx = (s.match(/\(([^)]*)\)/g)||[]).map(x=>x.slice(1,-1)); const main = s.replace(/\([^)]*\)/g, ' ');
+  const split = t=>t.split(/\s+y\s+|\/|,/i).map(x=>x.trim()).filter(Boolean);
+  return {main: split(main), ctx: ctx.flatMap(split)};
+}
+function extPatterns(comp, extra){
+  const n = extNorm(comp).trim(), stems = n.split(' ').filter(w=>w.length>=4 && !EXT_STOP.has(w)).map(w=>w.slice(0, Math.max(4, Math.min(6, w.length-1))));
+  return {exact: n, stems, syn: (EXT_LEXICON[n] || []).concat(extra || []).map(x=>extNorm(x).trim())};
+}
+function extCompMatch(text, comp, extra, common, isPlace){
+  const p = extPatterns(comp, extra);
+  if(isPlace){ // lugares: cuenta como lugar del hecho si viene con "en" ("en Rawson"); una mención suelta pesa poco
+    if(p.exact.length<3) return 0;
+    if([' en ', ' en la ciudad de ', ' en la localidad de ', ' hacia ', ' en el puerto de '].some(pre=>text.includes(pre+p.exact+' '))) return 2;
+    return text.includes(' '+p.exact+' ') ? 0.4 : 0;
+  }
+  // el nombre tal cual (salvo que sea una expresión común en casi todos los relatos, que no distingue nada)
+  if(!(common && common.has(p.exact)) && p.exact.length>=2 && (p.exact.length>=4 ? text.includes(' '+p.exact) : text.includes(' '+p.exact+' '))) return 2;
+  if(p.syn.some(s=>s && text.includes(' '+s))) return 1;
+  if(!(common && common.has(p.exact)) && p.stems.length>=2 && p.stems.every(st=>text.includes(' '+st))) return 1; // raíces: solo en nombres de dos o más palabras
+  return 0;
+}
+// Prepara las columnas: qué nombres de categorías son tan comunes en los relatos que no sirven para distinguir
+function prepareExtraction(columns, corpus){
+  const texts = corpus.map(extNorm), N = Math.max(1, texts.length);
+  Object.values(columns).forEach(info=>{
+    const common = new Set();
+    info.values.forEach(([v])=>{ const {main, ctx} = extComponents(v); main.concat(ctx).forEach(c=>{ const n = extNorm(c).trim(); if(!n) return;
+      const df = texts.filter(t=>t.includes(' '+n+' ') || (n.length>=4 && t.includes(' '+n))).length; if(df/N > 0.35) common.add(n); }); });
+    info.common = common;
+    const tot = info.values.reduce((a,[,f])=>a+f, 0); info.total = tot;
+  });
+  return columns;
+}
+// columnas: {col: {values: [[valor, frecuencia]], synonyms: {valor: [..]}}}
+function extFirstPos(text, comp, extra){ // posición de la primera mención de una categoría (para preferir a la protagonista)
+  const p = extPatterns(comp, extra); let pos = Infinity;
+  [p.exact].concat(p.syn).forEach(x=>{ if(!x) return; const i = text.indexOf(' '+x); if(i>=0 && i<pos) pos = i; });
+  return pos;
+}
+function extractRecord(text, columns){
+  const t = extNorm(text), out = {};
+  Object.entries(columns).forEach(([col, info])=>{
+    const vals = info.values.filter(([v])=>v && !/^-+$/.test(String(v).trim()));
+    const none = info.values.find(([v])=>/^-+$/.test(String(v).trim()));
+    let best = null; const cands = [];
+    vals.forEach(([v, freq])=>{
+      const comps = extComponents(v), main = [...new Set(comps.main.map(c=>extNorm(c).trim()))], ctx = [...new Set(comps.ctx.map(c=>extNorm(c).trim()))], syn = (info.synonyms||{})[v];
+      const mm = main.map(c=>extCompMatch(t, c, syn, info.common, info.isPlace)), cm = ctx.map(c=>extCompMatch(t, c, null, info.common, info.isPlace));
+      const hit = mm.filter(x=>x>=1).length; if(!hit) return; // menciones sueltas de lugares no alcanzan por sí solas
+      const score = mm.reduce((a,b)=>a+b,0) - 1.5*mm.filter(x=>x===0).length + 0.5*cm.filter(x=>x>0).length - 0.8*cm.filter(x=>x===0).length + 0.35*Math.log(1+freq);
+      cands.push({value: v, score, pos: Math.min(...main.map(c=>extFirstPos(t, c, syn))), single: main.length===1, conf: mm.some(x=>x===2) && mm.every(x=>x>0) ? 'alta' : 'media'});
+    });
+    // entre categorías simples, la mencionada primero suele ser la protagonista
+    const singles = cands.filter(c=>c.single && isFinite(c.pos));
+    if(singles.length>1){ const first = singles.reduce((a,b)=>a.pos<=b.pos ? a : b); first.score += 0.6; }
+    cands.forEach(c=>{ if(!best || c.score > best.score) best = c; });
+    if(best){ out[col] = {value: best.value, conf: best.conf, src: 'texto'}; return; }
+    // sin coincidencias: si un valor domina la columna, se propone ese (con confianza baja); si no, "sin dato"
+    const top = vals.slice().sort((a,b)=>b[1]-a[1])[0], share = top && info.total ? top[1]/info.total : 0;
+    if(top && share >= 0.35) out[col] = {value: top[0], conf: 'baja', src: 'habitual', why: `no aparece en el texto; es el valor más habitual de la columna (${Math.round(100*share)}%)`};
+    else out[col] = {value: none ? none[0] : '', conf: 'baja', src: 'ninguno', why: 'no aparece en el texto'};
+  });
+  return out;
+}
+// Lo que el relato no dice, pero la base sí sabe: si un campo quedó sin coincidencias y otro se identificó con confianza
+// (por ejemplo, la empresa), se usa el valor habitual de ese campo para esa empresa en la base.
+function extApplyAssociations(out, baseRows){
+  if(!baseRows || !baseRows.length) return out;
+  const anchors = Object.entries(out).filter(([,x])=>x.conf!=='baja' && x.value && !/^-+$/.test(x.value));
+  Object.entries(out).forEach(([col, x])=>{
+    if(x.conf!=='baja') return;
+    let best = null;
+    anchors.forEach(([acol, a])=>{ if(acol===col) return;
+      const rows = baseRows.filter(r=>extNorm(r[acol])===extNorm(a.value)); if(rows.length<3) return;
+      const cnt = new Map(); rows.forEach(r=>{ const v = String(r[col]==null ? '' : r[col]).trim(); if(v) cnt.set(v, (cnt.get(v)||0)+1); });
+      const top = [...cnt.entries()].sort((p,q)=>q[1]-p[1])[0]; if(!top) return;
+      const share = top[1]/rows.length; if(share>=0.6 && (!best || share>best.share)) best = {value: top[0], share, acol, aval: a.value, n: rows.length};
+    });
+    if(best) out[col] = {value: best.value, conf: 'media', src: 'base', why: `no aparece en el texto; en la base, para «${best.aval}» (${best.acol}) es el valor habitual (${Math.round(100*best.share)}% de ${best.n} registros)`};
+  });
+  return out;
+}
+/* ===== DEL RELATO AL REGISTRO (fin) ===== */
+
+
+/* ===== DEL RELATO AL REGISTRO: interfaz (inicio) ===== */
+const EXT_SRC = {texto:'encontrado en el texto', base:'deducido de la base', habitual:'valor habitual de la columna', ninguno:'sin propuesta', manual:'cambiado a mano'};
+function extTargetColumns(ds){ return ds.columns.filter(c=>c!==ds.dateCol && !isPeriodCol(c) && !['id','texto','fragmento','numero','peso'].includes(colRole(ds,c))); }
+function extBuildColumns(ds, cols, rows){
+  const dict = (project.extDict||{}), out = {};
+  cols.forEach(c=>{ const m = new Map(); (rows || ds.rows).forEach(r=>{ const v = r[c]==null ? '' : String(r[c]).trim(); if(v) m.set(v, (m.get(v)||0)+1); });
+    out[c] = {values: [...m.entries()], isPlace: colRole(ds,c)==='lugar' || /localidad|lugar|ciudad|partido|departamento/i.test(c), synonyms: dict[c] || {}}; });
+  prepareExtraction(out, Object.values(qualDocs).flatMap(d=>d.entries.map(e=>e.cuerpo||e.texto||'')));
+  return out;
+}
+function extBaseRows(ds, cols){ return ds.rows.map(r=>Object.fromEntries(cols.map(c=>[c, r[c]==null ? '' : String(r[c]).trim()]))); }
+function extRelatos(topic){
+  return Object.values(qualDocs).flatMap(d=>d.entries.map(e=>({doc: d.label, e, text: e.cuerpo||e.texto||'', date: (e.anio && e.mes && e.dia) ? new Date(e.anio, e.mes-1, e.dia) : null})))
+    .filter(x=>x.date && x.text.trim() && (!topic || (x.e.topicos||[]).includes(topic)));
+}
+const extDayKey = d=>d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+// Medición con los datos propios: relatos y registros de la misma fecha (uno y uno), dejando cada registro afuera
+function extEvaluate(ds, cols){
+  const byDayR = new Map(); ds.rows.forEach(r=>{ const d = r[ds.dateCol]; if(d instanceof Date){ const k = extDayKey(d); if(!byDayR.has(k)) byDayR.set(k, []); byDayR.get(k).push(r); } });
+  const byDayT = new Map(); extRelatos('').forEach(x=>{ const k = extDayKey(x.date); if(!byDayT.has(k)) byDayT.set(k, []); byDayT.get(k).push(x); });
+  const pairs = []; byDayR.forEach((rs, k)=>{ const ts = byDayT.get(k); if(ts && rs.length===1 && ts.length===1) pairs.push([ts[0], rs[0]]); });
+  if(pairs.length<10) return {pairs: pairs.length};
+  const res = {}; cols.forEach(c=>res[c] = {ok:0, base:0, n:0});
+  pairs.forEach(([t, rec])=>{
+    const others = ds.rows.filter(r=>r!==rec);
+    const columns = extBuildColumns(ds, cols, others);
+    const ex = extApplyAssociations(extractRecord(t.text, columns), extBaseRows({rows: others}, cols));
+    cols.forEach(c=>{ const g = rec[c]==null ? '' : String(rec[c]).trim(); if(!g) return; res[c].n++;
+      if(extNorm(ex[c].value)===extNorm(g)) res[c].ok++;
+      const top = columns[c].values.slice().sort((a,b)=>b[1]-a[1])[0]; if(top && extNorm(top[0])===extNorm(g)) res[c].base++; });
+  });
+  return {pairs: pairs.length, res};
+}
+function openExtractDialog(){
+  const bases = Object.keys(datasets).filter(k=>datasets[k].dateCol);
+  if(!bases.length){ showModal('Pasar relatos a una base', '<p class="empty">Hace falta una base de datos con una columna de fecha (por ejemplo, tu base de conflictos), a la que se sumarán los registros.</p>'); return; }
+  if(!extRelatos('').length){ showModal('Pasar relatos a una base', '<p class="empty">No hay relatos con fecha completa (día, mes y año).</p>'); return; }
+  const topics = [...new Set(Object.values(qualDocs).flatMap(d=>d.entries.flatMap(e=>e.topicos||[])))];
+  const defTopic = topics.find(t=>/conflict/i.test(t)) || '';
+  showModal('Pasar relatos a una base de datos', `
+    <p class="hint">Telar lee cada relato y propone un registro con las categorías que ya usa la base (fecha, organización, forma, empresa, lugar…). Es una <strong>propuesta para revisar</strong>: el color de cada valor indica de dónde salió, y todo se puede cambiar antes de sumarlo a la base. ${glLink('extraccion','¿Cómo funciona?')}</p>
+    <div class="adv-controls">
+      <div class="field"><label>Base de destino</label><select id="ex-ds">${bases.map(k=>`<option value="${esc(k)}" ${k===active ? 'selected' : ''}>${esc(datasets[k].label)}</option>`).join('')}</select></div>
+      <div class="field"><label>Relatos del tópico</label><select id="ex-topic"><option value="">Todos</option>${topics.map(t=>`<option ${t===defTopic ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>
+      <label class="chk-opt" style="align-self:flex-end"><input type="checkbox" id="ex-skip" checked> Omitir fechas que ya tienen registro en la base</label>
+    </div>
+    <div id="ex-cols" style="display:flex;gap:4px 14px;flex-wrap:wrap;margin:4px 0 10px"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="go" id="ex-run">Proponer registros</button><button class="mini-export" id="ex-eval">Medir con mis datos</button><button class="mini-export" id="ex-dict">Sinónimos…</button></div>
+    <div id="ex-out" style="margin-top:12px"></div>`, {wide:true});
+  const fillCols = ()=>{ const ds = datasets[document.getElementById('ex-ds').value], cols = extTargetColumns(ds);
+    document.getElementById('ex-cols').innerHTML = '<span class="hint" style="margin:0">Columnas a completar:</span> ' + cols.map(c=>`<label class="chk-opt"><input type="checkbox" class="ex-col" value="${esc(c)}" ${/prensa|fuente|resultado|observ/i.test(c) ? '' : 'checked'}> ${esc(c)}</label>`).join(''); };
+  fillCols(); document.getElementById('ex-ds').onchange = ()=>{ fillCols(); document.getElementById('ex-out').innerHTML = ''; };
+  const selCols = ()=>[...document.querySelectorAll('.ex-col:checked')].map(c=>c.value);
+  document.getElementById('ex-eval').onclick = ()=>{
+    const ds = datasets[document.getElementById('ex-ds').value], cols = selCols(), out = document.getElementById('ex-out');
+    out.innerHTML = '<p class="hint">Midiendo…</p>';
+    setTimeout(()=>{ const r = extEvaluate(ds, cols);
+      if(!r.res){ out.innerHTML = `<p class="empty">Para medir hacen falta al menos 10 fechas con exactamente un relato y un registro (hay ${r.pairs}).</p>`; return; }
+      out.innerHTML = `<p><strong>Cuánto acierta con tus datos</strong>: ${r.pairs} fechas con un relato y un registro, comparando la propuesta con lo que cargaste a mano (cada registro se deja afuera al calcular las categorías y asociaciones).</p>
+        <div class="tablewrap"><table><thead><tr><th>Columna</th><th>Propuesta de Telar</th><th>Siempre el valor más frecuente</th><th>Lectura</th></tr></thead><tbody>${cols.filter(c=>r.res[c].n).map(c=>{ const x = r.res[c], a = x.ok/x.n, b = x.base/x.n;
+          return `<tr><td>${esc(c)}</td><td><strong>${Math.round(100*a)}%</strong></td><td>${Math.round(100*b)}%</td><td>${a-b>=0.15 ? 'la propuesta ayuda mucho' : a-b>=0.04 ? 'ayuda algo: revisar' : 'no mejora a lo habitual: revisar con atención'}</td></tr>`; }).join('')}</tbody></table></div>
+        <p class="hint">Sirve para saber en qué columnas confiar más y cuáles revisar con más atención. Los sinónimos del diccionario pueden mejorar los resultados.</p>`;
+      logEvent('base', `Medición de la propuesta de registros desde relatos en «${ds.label}» sobre ${r.pairs} pares: ${cols.filter(c=>r.res[c].n).map(c=>`${c} ${Math.round(100*r.res[c].ok/r.res[c].n)}% (más frecuente: ${Math.round(100*r.res[c].base/r.res[c].n)}%)`).join('; ')}.`);
+    }, 30);
+  };
+  document.getElementById('ex-dict').onclick = ()=>openExtractDictionary(selCols());
+  document.getElementById('ex-run').onclick = ()=>{
+    const dk = document.getElementById('ex-ds').value, ds = datasets[dk], cols = selCols(), out = document.getElementById('ex-out');
+    if(!cols.length){ out.innerHTML = '<p class="empty">Marcá al menos una columna.</p>'; return; }
+    const have = new Set(ds.rows.map(r=>r[ds.dateCol] instanceof Date ? extDayKey(r[ds.dateCol]) : '').filter(Boolean));
+    let rel = extRelatos(document.getElementById('ex-topic').value);
+    if(document.getElementById('ex-skip').checked) rel = rel.filter(x=>!have.has(extDayKey(x.date)));
+    if(!rel.length){ out.innerHTML = '<p class="empty">No quedan relatos para proponer con estos criterios.</p>'; return; }
+    const columns = extBuildColumns(ds, cols), baseRows = extBaseRows(ds, cols);
+    const props = rel.map(x=>({x, ex: extApplyAssociations(extractRecord(x.text, columns), baseRows)}));
+    const lists = cols.map((c,i)=>`<datalist id="ex-dl-${i}">${columns[c].values.slice().sort((a,b)=>b[1]-a[1]).map(([v])=>`<option value="${esc(v)}">`).join('')}</datalist>`).join('');
+    out.innerHTML = lists + `<p style="margin:0 0 6px"><strong>${props.length}</strong> registros propuestos. <span class="ex-src ex-texto">encontrado en el texto</span> <span class="ex-src ex-base">deducido de la base</span> <span class="ex-src ex-habitual">valor habitual</span> <span class="ex-src ex-ninguno">sin propuesta</span> · Pasá el mouse por un valor para ver por qué se propuso.</p>
+      <div class="tablewrap" style="max-height:52vh;overflow:auto"><table class="ex-table"><thead><tr><th><input type="checkbox" id="ex-all" checked title="Marcar todos"></th><th>Fecha</th><th>Relato</th>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${props.map((p,ri)=>`<tr><td><input type="checkbox" class="ex-inc" data-ri="${ri}" checked></td><td style="white-space:nowrap">${p.x.date.toLocaleDateString('es-AR')}</td><td class="ex-text" title="${esc(p.x.text)}"><div class="ex-text-inner">${esc(p.x.text.slice(0, 260))}${p.x.text.length>260 ? '…' : ''}</div></td>${cols.map((c,ci)=>{ const e = p.ex[c]; return `<td><input class="ex-val ex-${e.src}" data-ri="${ri}" data-c="${ci}" list="ex-dl-${ci}" value="${esc(e.value||'')}" title="${esc(EXT_SRC[e.src] + (e.why ? ': '+e.why : ''))}"></td>`; }).join('')}</tr>`).join('')}</tbody></table></div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="go" id="ex-add">Agregar los registros marcados a «${esc(ds.label)}»</button><button class="mini-export" id="ex-xlsx">⭳ Descargar en Excel</button></div>`;
+    out.querySelectorAll('.ex-val').forEach(inp=>inp.addEventListener('input', ()=>{ inp.className = 'ex-val ex-manual'; inp.title = EXT_SRC.manual; }));
+    document.getElementById('ex-all').onchange = e=>out.querySelectorAll('.ex-inc').forEach(c=>{ c.checked = e.target.checked; });
+    const collect = ()=>[...out.querySelectorAll('.ex-inc:checked')].map(c=>{ const ri = +c.dataset.ri, rec = {date: props[ri].x.date, text: props[ri].x.text, vals: {}, srcs: {}};
+      cols.forEach((col,ci)=>{ const inp = out.querySelector(`.ex-val[data-ri="${ri}"][data-c="${ci}"]`); rec.vals[col] = inp.value.trim(); rec.srcs[col] = inp.className.replace('ex-val ex-',''); }); return rec; });
+    document.getElementById('ex-xlsx').onclick = ()=>{ const recs = collect();
+      downloadXLSX(xlsxName('registros_desde_relatos'), [{name:'Registros propuestos', aoa: [[ds.dateCol].concat(cols, ['Relato'])].concat(recs.map(r=>[r.date.toLocaleDateString('es-AR')].concat(cols.map(c=>r.vals[c]), [r.text])))}], ['Registros propuestos desde relatos', 'Propuesta asistida revisada por la persona investigadora.']); };
+    document.getElementById('ex-add').onclick = ()=>{
+      const recs = collect(); if(!recs.length){ alert('No hay registros marcados.'); return; }
+      if(!confirm(`Se van a sumar ${recs.length} registros a «${ds.label}». ¿Continuar?`)) return;
+      recs.forEach(r=>{ const row = {}; ds.allCols.forEach(c=>{ row[c] = null; }); row[ds.dateCol] = r.date; cols.forEach(c=>{ row[c] = r.vals[c] || null; });
+        row.__AñoBase = r.date.getFullYear(); row.__Año = r.date.getFullYear(); ds.rows.push(row); });
+      ds.extracted = (ds.extracted||0) + recs.length;
+      const manual = recs.reduce((a,r)=>a + cols.filter(c=>r.srcs[c]==='manual').length, 0), total = recs.length*cols.length;
+      logEvent('base', `Se sumaron ${recs.length} registros a «${ds.label}» a partir de relatos, con propuesta asistida revisada: ${manual} de ${total} valores (${Math.round(100*manual/Math.max(1,total))}%) se cambiaron a mano.`);
+      invalidateCats(ds); closeModal(false); if(active===dk) buildUI(); updateMainTabCounts(); persistSession();
+      alert(`Se sumaron ${recs.length} registros a «${ds.label}».`);
+    };
+  };
+}
+function openExtractDictionary(cols){
+  const dict = project.extDict = project.extDict || {};
+  const txt = c=>Object.entries(dict[c]||{}).map(([v, syn])=>`${v}: ${syn.join(', ')}`).join('\n');
+  const prev = document.getElementById('modal-body').innerHTML; // se vuelve al diálogo anterior al cerrar
+  showModal('Sinónimos para reconocer cada categoría', `<p class="hint">Una línea por categoría: <code>Valor: sinónimo, otro sinónimo</code>. Por ejemplo, <code>Huelga: paro, medida de fuerza</code> o <code>STIA: sindicato de la alimentación</code>. Se usan al proponer registros desde los relatos. Telar ya incluye sinónimos de partida para formas de protesta y motivos frecuentes.</p>
+    ${cols.map((c,i)=>`<div class="field" style="max-width:100%;margin-bottom:8px"><label>${esc(c)}</label><textarea class="ex-dict-ta" data-c="${esc(c)}" rows="3" style="width:100%;font:inherit;font-size:.85rem">${esc(txt(c))}</textarea></div>`).join('')}
+    <button class="go" id="ex-dict-ok">Guardar sinónimos</button>`);
+  document.getElementById('ex-dict-ok').onclick = ()=>{
+    document.querySelectorAll('.ex-dict-ta').forEach(ta=>{ const m = {}; ta.value.split('\n').forEach(l=>{ const i = l.indexOf(':'); if(i<1) return; const v = l.slice(0,i).trim(), syn = l.slice(i+1).split(',').map(x=>x.trim()).filter(Boolean); if(v && syn.length) m[v] = syn; }); dict[ta.dataset.c] = m; });
+    persistSession(); closeModal(false); openExtractDialog();
+  };
+}
+/* ===== DEL RELATO AL REGISTRO: interfaz (fin) ===== */
+
+/* ===== CODIFICACIÓN POR DICCIONARIO (inicio) ===== */
+// Reglas "Código: patrón, prefijo*, "frase exacta"" que proponen codificar oraciones; quien investiga revisa y aplica.
+function dictNorm(s){ return ' ' + String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9ñ]+/g,' ').trim() + ' '; }
+function parseCodeDict(text){
+  const rules = [];
+  String(text||'').split('\n').forEach(line=>{ const i = line.indexOf(':'); if(i<1) return;
+    const code = normCodeName(line.slice(0,i).trim()), raw = line.slice(i+1);
+    const pats = (raw.match(/"[^"]+"|[^,]+/g)||[]).map(p=>p.trim().replace(/^"|"$/g,'').trim()).filter(Boolean);
+    if(code && pats.length) rules.push({code, pats: pats.map(p=>({raw: p, prefix: /\*$/.test(p), n: dictNorm(p.replace(/\*$/,'')).trim()})).filter(p=>p.n)}); });
+  return rules;
+}
+function dictMatch(normSentence, pat){ return pat.prefix ? normSentence.includes(' '+pat.n) : normSentence.includes(' '+pat.n+' '); }
+// oraciones de un texto, con su posición
+function sentencesOf(text, from=0){
+  const out = [], re = /[^.!?;\n]+[.!?;]*/g; let m; const sub = text.slice(from);
+  while((m = re.exec(sub))){ const raw = m[0], lead = raw.length - raw.trimStart().length, t = raw.trim(); if(t.length<3) continue; out.push({s: from + m.index + lead, e: from + m.index + lead + t.length, text: t}); }
+  return out;
+}
+// unidades codificables: relatos y/o intervenciones de entrevistas (con su clave para aplicar códigos)
+function dictUnits(source){
+  const out = [];
+  if(source!=='iv') Object.entries(qualDocs).forEach(([qk, d])=>d.entries.forEach((en, qi)=>{ const it = codableItem('q:'+qk+':'+qi); if(!it) return;
+    sentencesOf(it.base, it.shift).forEach(se=>out.push(Object.assign({src: 'q:'+qk+':'+qi, where: d.label + (en.dia ? ` · ${en.dia}/${en.mes}/${en.anio}` : ''), item: en}, se))); }));
+  if(source!=='rel') Object.entries(interviews).forEach(([k, iv])=>iv.turns.forEach((t, ti)=>{ if(((iv.speakers||{})[t.label]||{}).role==='entrevistador') return;
+    sentencesOf(t.text||'').forEach(se=>out.push(Object.assign({src: 'i:'+k+':'+ti, where: interviewDisplayLabel(iv), item: t, iv}, se))); }));
+  return out;
+}
+function unitHasCode(u, code){ return (u.item.sel||[]).some(c=>c.s < u.e && c.e > u.s && (c.codes||[]).some(x=>x===code || x.startsWith(code+'\\'))) || (u.item.codes||[]).includes(code); }
+function runCodeDict(rules, source){
+  const units = dictUnits(source), props = [];
+  units.forEach(u=>{ const n = dictNorm(u.text);
+    rules.forEach(r=>{ const hit = r.pats.filter(p=>dictMatch(n, p)); if(hit.length) props.push({u, code: r.code, hit: hit.map(p=>p.raw), already: unitHasCode(u, r.code)}); }); });
+  return {units, props};
+}
+// acuerdo con la codificación manual, oración por oración (kappa de Cohen por código)
+function dictAgreement(rules, source){
+  const {units, props} = runCodeDict(rules, source), rows = [];
+  rules.forEach(r=>{
+    const manual = units.map(u=>unitHasCode(u, r.code)), auto = units.map(u=>props.some(p=>p.u===u && p.code===r.code));
+    const n = units.length, a = manual.filter((m,i)=>m && auto[i]).length, b = manual.filter((m,i)=>m && !auto[i]).length, c = manual.filter((m,i)=>!m && auto[i]).length, d = n-a-b-c;
+    if(!manual.some(Boolean)) return;
+    const po = (a+d)/n, pe = ((a+b)*(a+c) + (c+d)*(b+d))/(n*n), kappa = pe<1 ? (po-pe)/(1-pe) : 1;
+    rows.push({code: r.code, both: a, onlyManual: b, onlyDict: c, kappa, precision: a+c ? a/(a+c) : null, recall: a+b ? a/(a+b) : null});
+  });
+  return {rows, n: units.length};
+}
+function suggestDictFromCodebook(){
+  return codebook().filter(c=>!c.name.includes('\\') || true).map(c=>{ const leaf = c.name.split('\\').pop();
+    const words = dictNorm(leaf).trim().split(' ').filter(w=>w.length>=4 && !['para','como','entre','sobre','desde'].includes(w));
+    return words.length ? `${c.name}: ${words.map(w=>w.length>6 ? w.slice(0, w.length-2)+'*' : w).join(', ')}` : ''; }).filter(Boolean).join('\n');
+}
+function openCodeDictDialog(){
+  const hasRel = Object.values(qualDocs).some(d=>d.entries.length), hasIv = Object.keys(interviews).length>0;
+  if(!hasRel && !hasIv){ showModal('Codificar con un diccionario', '<p class="empty">Hace falta cargar relatos o entrevistas.</p>'); return; }
+  const text = project.codeDict || suggestDictFromCodebook() || 'Despidos: despid*, cesant*, telegrama\nAtraso salarial: atraso, "falta de pago", adeud*, aguinaldo';
+  showModal('Codificar con un diccionario', `
+    <p class="hint">Una regla por línea: <code>Código: palabra, prefijo*, "frase exacta"</code>. Telar busca cada regla en las oraciones y propone codificar la oración completa; no distingue mayúsculas ni tildes. Las propuestas se revisan antes de aplicarlas. ${glLink('diccionario','¿Cómo usarlo bien?')}</p>
+    <textarea id="cd-rules" rows="7" style="width:100%;font:inherit;font-size:.85rem">${esc(text)}</textarea>
+    <div class="adv-controls" style="margin-top:6px">
+      <div class="field"><label>Buscar en</label><select id="cd-src">${hasRel ? '<option value="rel">Relatos</option>' : ''}${hasIv ? '<option value="iv">Entrevistas (respuestas)</option>' : ''}${hasRel && hasIv ? '<option value="all">Relatos y entrevistas</option>' : ''}</select></div>
+      <button class="go" id="cd-run" style="align-self:flex-end">Buscar coincidencias</button>
+      <button class="mini-export" id="cd-cmp" style="align-self:flex-end" title="Si ya codificaste a mano con estos códigos, mide cuánto coinciden las reglas con tu criterio">Comparar con lo ya codificado</button>
+      ${codebook().length ? '<button class="mini-export" id="cd-sug" style="align-self:flex-end">Proponer reglas desde el libro de códigos</button>' : ''}
+    </div>
+    <div id="cd-out" style="margin-top:10px"></div>`, {wide:true});
+  const rules = ()=>{ project.codeDict = document.getElementById('cd-rules').value; persistSession(); return parseCodeDict(project.codeDict); };
+  const sug = document.getElementById('cd-sug'); if(sug) sug.onclick = ()=>{ document.getElementById('cd-rules').value = suggestDictFromCodebook(); };
+  document.getElementById('cd-cmp').onclick = ()=>{
+    const R = rules(), out = document.getElementById('cd-out'); if(!R.length){ out.innerHTML = '<p class="empty">Escribí al menos una regla.</p>'; return; }
+    const ag = dictAgreement(R, document.getElementById('cd-src').value);
+    if(!ag.rows.length){ out.innerHTML = '<p class="empty">Todavía no hay oraciones codificadas a mano con estos códigos, así que no hay con qué comparar.</p>'; return; }
+    out.innerHTML = `<p><strong>Acuerdo con tu codificación manual</strong>, oración por oración (${ag.n} oraciones):</p><div class="tablewrap"><table><thead><tr><th>Código</th><th>Coinciden</th><th>Solo a mano</th><th>Solo por reglas</th><th>Precisión</th><th>Cobertura</th><th>Kappa</th></tr></thead><tbody>${ag.rows.map(r=>`<tr><td>${esc(r.code)}</td><td>${r.both}</td><td>${r.onlyManual}</td><td>${r.onlyDict}</td><td>${r.precision==null ? '—' : fmtN(100*r.precision,0)+'%'}</td><td>${r.recall==null ? '—' : fmtN(100*r.recall,0)+'%'}</td><td>${fmtN(r.kappa,2)}</td></tr>`).join('')}</tbody></table></div>
+      <p class="hint">Precisión: de lo que proponen las reglas, cuánto codificaste vos. Cobertura: de lo que codificaste, cuánto encuentran las reglas. Kappa: acuerdo más allá del azar (desde 0,6, sustancial). Con valores bajos, conviene ajustar las reglas antes de aplicarlas. ${glLink('kappa','¿Qué es kappa?')}</p>`;
+    logEvent('codigos', `Comparación de la codificación por diccionario con la manual (${ag.n} oraciones): ${ag.rows.map(r=>`${r.code} kappa ${fmtN(r.kappa,2)}`).join('; ')}.`);
+  };
+  document.getElementById('cd-run').onclick = ()=>{
+    const R = rules(), out = document.getElementById('cd-out'); if(!R.length){ out.innerHTML = '<p class="empty">Escribí al menos una regla.</p>'; return; }
+    const {props} = runCodeDict(R, document.getElementById('cd-src').value);
+    if(!props.length){ out.innerHTML = '<p class="empty">Ninguna regla encontró coincidencias.</p>'; return; }
+    const by = {}; props.forEach(p=>{ by[p.code] = (by[p.code]||0)+1; });
+    const mark = (text, hits)=>{ let h = esc(text); hits.forEach(raw=>{ const base = raw.replace(/\*$/,''); if(base.length<2) return; const re = new RegExp('('+base.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[.*+?^${}()|[\]\\]/g,'\\$&').split('').map(ch=>/[aeiou]/i.test(ch) ? `[${ch}${ch.toUpperCase()}${({a:'áÁ',e:'éÉ',i:'íÍ',o:'óÓ',u:'úÚü'})[ch.toLowerCase()]||''}]` : ch).join('')+(raw.endsWith('*') ? '[\\p{L}]*' : '')+')', 'giu'); h = h.replace(re, '<mark>$1</mark>'); }); return h; };
+    out.innerHTML = `<p><strong>${props.length}</strong> propuestas: ${Object.entries(by).map(([c,n])=>`${esc(c)} (${n})`).join(' · ')}. ${props.filter(p=>p.already).length ? props.filter(p=>p.already).length+' ya estaban codificadas y no se tocan.' : ''}</p>
+      <div class="tablewrap" style="max-height:48vh;overflow:auto"><table><thead><tr><th><input type="checkbox" id="cd-all" checked></th><th>Código</th><th>Fragmento</th><th>Dónde</th></tr></thead><tbody>${props.map((p,i)=>`<tr${p.already ? ' style="opacity:.55"' : ''}><td>${p.already ? '✓' : `<input type="checkbox" class="cd-inc" data-i="${i}" checked>`}</td><td style="white-space:nowrap">${esc(p.code)}</td><td style="white-space:normal;font-size:.85rem">${mark(applyPseudo(p.u.iv, p.u.text), p.hit)}${p.already ? ' <span class="hint">(ya codificado)</span>' : ''}</td><td style="font-size:.75rem">${esc(p.u.where)}</td></tr>`).join('')}</tbody></table></div>
+      <button class="go" id="cd-apply" style="margin-top:10px">Aplicar los códigos marcados</button>`;
+    document.getElementById('cd-all').onchange = e=>out.querySelectorAll('.cd-inc').forEach(c=>{ c.checked = e.target.checked; });
+    document.getElementById('cd-apply').onclick = ()=>{
+      const sel = [...out.querySelectorAll('.cd-inc:checked')].map(c=>props[+c.dataset.i]); if(!sel.length){ alert('No hay propuestas marcadas.'); return; }
+      sel.forEach(p=>{ const ex = (p.u.item.sel||[]).find(c=>c.s===p.u.s && c.e===p.u.e); applyCoding(p.u.src, p.u.s, p.u.e, (ex ? ex.codes : []).concat([p.code])); });
+      project.dictCoded = (project.dictCoded||0) + sel.length;
+      logEvent('codigos', `Codificación por diccionario: ${sel.length} fragmentos (oraciones) codificados con reglas revisadas (${[...new Set(sel.map(p=>p.code))].join(', ')}).`);
+      persistSession(); closeModal(false); try{ renderQualUI(); renderInterviewsUI && renderInterviewsUI(); }catch(e){} try{ renderCodesUI && renderCodesUI(); }catch(e){} updateMainTabCounts();
+      alert(`Se aplicaron ${sel.length} códigos.`);
+    };
+  };
+}
+/* ===== CODIFICACIÓN POR DICCIONARIO (fin) ===== */
+
+/* ===== RED DE PALABRAS (inicio) ===== */
+// Palabras que aparecen juntas en las mismas oraciones (entre las más frecuentes)
+function wordNetwork(units, o, topN=40, minW=3){
+  const sents = units.flatMap(u=>String(u.text||'').split(/(?<=[.!?;])\s+/)).map(s=>[...new Set(waTerms(s, Object.assign({}, o, {bigrams:false})))]).filter(s=>s.length>1);
+  const freq = new Map(); sents.forEach(s=>s.forEach(w=>freq.set(w, (freq.get(w)||0)+1)));
+  const top = new Set([...freq.entries()].sort((a,b)=>b[1]-a[1] || a[0].localeCompare(b[0])).slice(0, topN).map(x=>x[0]));
+  // umbral automático: si hay demasiados vínculos para leerlos, se exigen más co-apariciones
+  const units2 = sents.map(s=>s.filter(w=>top.has(w))); let g = netBuild(units2, minW);
+  while(g.edges.length > 90 && minW < 15){ minW++; g = netBuild(units2, minW); }
+  return {g, sentences: sents.length, minW};
+}
+/* ===== RED DE PALABRAS (fin) ===== */
 
 /* ===== OCR: texto desde imágenes, fotos y PDF escaneados (inicio) ===== */
 // Motor: Tesseract (incluido en vendor/tesseract, se descarga solo la primera vez que se usa).
@@ -8059,7 +8418,7 @@ function mapPoints(ds){
   const locCol = ds.columns.find(c=>colRole(ds,c)==='lugar');
   if(!locCol) return {error: 'Esta base no tiene una columna de tipo "Lugar" ni columnas de latitud y longitud. Podés marcar el lugar en ⚙ Columnas de esta base.'};
   if(!Object.keys(project.places||{}).length) return {error: 'Todavía no hay coordenadas cargadas. Cargá un listado de lugares (nombre, latitud, longitud) en ⚙ Configurar proyecto, o sumá a la base columnas de latitud y longitud.'};
-  const counts = {}; rows.forEach(r=>{ const w = Wm(r); getCategories(ds,r,locCol).forEach(loc=>{ if(loc==='(sin dato)') return; counts[loc]=(counts[loc]||0)+w; }); });
+  const counts = {}; rows.forEach(r=>{ const w = Wm(r); getCategories(ds,r,locCol).forEach(loc=>{ if(loc==='(sin dato)' || /^[-–—\s.]*$/.test(loc)) return; counts[loc]=(counts[loc]||0)+w; }); });
   const points = Object.entries(counts).map(([name,count])=>{ const c = findPlaceCoord(name); return c ? {name, count: round2(count), lat:c[0], lon:c[1]} : null; }).filter(Boolean);
   if(!points.length) return {error: 'Ningún valor de "'+locCol+'" coincide con los lugares cargados en la configuración del proyecto. Revisá que los nombres sean iguales o sumá los que falten.'};
   const missing = Object.keys(counts).filter(n=>!findPlaceCoord(n));
@@ -8084,18 +8443,24 @@ async function renderMap(){
   leafletMap = map;
   const b = L.latLngBounds(R.points.map(p=>[p.lat, p.lon]));
   if(R.points.length===1) map.setView(b.getCenter(), 8); else map.fitBounds(b.pad(0.25)); // primero la vista; después las capas
-  L.geoJSON(TELAR_BASE.paises, {style: {color:'#9AAAAE', weight:1, fillColor:'#F4F6F5', fillOpacity:1}, interactive:false}).addTo(map);
-  L.geoJSON(TELAR_BASE.provincias, {style: {color:'#B8C3C0', weight:0.7, fill:false}, interactive:false}).addTo(map);
+  // cartografía incluida (simplificada): alcanza hasta escala regional; para acercar más, el fondo detallado
+  const baseLayers = [L.geoJSON(TELAR_BASE.paises, {style: {color:'#9AAAAE', weight:1, fillColor:'#F4F6F5', fillOpacity:1}, interactive:false}), L.geoJSON(TELAR_BASE.provincias, {style: {color:'#B8C3C0', weight:0.7, fill:false}, interactive:false})];
+  baseLayers.forEach(l=>l.addTo(map)); map.setMaxZoom(10);
   map.attributionControl.setPrefix(false); map.attributionControl.addAttribution('Cartografía: Natural Earth');
   const maxC = Math.max(...R.points.map(p=>p.count));
   const sorted = R.points.slice().sort((a,b)=>b.count-a.count);
   sorted.forEach((p,i)=>{ const color = p.count===maxC ? '#B5533C' : '#2F6B6E';
     const m = L.circleMarker([p.lat, p.lon], {radius: 5 + 20*Math.sqrt(p.count/maxC), color, weight:1.5, fillColor: color, fillOpacity:0.5}).addTo(map);
-    m.bindTooltip(`${esc(p.name)} (${p.count})`, {permanent: i<12, direction:'top', className:'map-label'}); });
+    m.bindTooltip(`${esc(p.name)} (${p.count})`, {permanent: i<15, direction:'top', className:'map-label'}); m.bindPopup(`<strong>${esc(p.name)}</strong>: ${p.count}`); });
+  // etiquetas: las que se pisarían con otra de un lugar más grande se ocultan; se recalculan al acercar o alejar
+  const declutter = ()=>{ const kept = []; document.querySelectorAll('#map-leaflet .leaflet-tooltip.map-label').forEach(el=>{ el.style.visibility = ''; const r = el.getBoundingClientRect();
+    if(kept.some(k=>!(r.right < k.left || r.left > k.right || r.bottom < k.top || r.top > k.bottom))) el.style.visibility = 'hidden'; else kept.push(r); }); };
+  map.on('zoomend moveend', ()=>setTimeout(declutter, 30)); setTimeout(declutter, 60);
   document.getElementById('map-osm').onchange = e=>{
-    if(e.target.checked){ osmLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 18, attribution: '© colaboradores de OpenStreetMap'}).addTo(map); osmLayer.bringToBack(); }
-    else if(osmLayer){ map.removeLayer(osmLayer); osmLayer = null; }
+    if(e.target.checked){ baseLayers.forEach(l=>map.removeLayer(l)); map.setMaxZoom(18); osmLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 18, attribution: '© colaboradores de OpenStreetMap'}).addTo(map); osmLayer.bringToBack(); }
+    else { if(osmLayer){ map.removeLayer(osmLayer); osmLayer = null; } baseLayers.forEach(l=>l.addTo(map)); l_bringMarkers(); map.setMaxZoom(10); }
   };
+  function l_bringMarkers(){ map.eachLayer(l=>{ if(l instanceof L.CircleMarker) l.bringToFront(); }); }
   const title = 'Mapa: '+ds.label;
   document.getElementById('map-png').onclick = async ()=>{ const u = await svgToPngDataURL(mapStaticSvg(R.points)); const a = document.createElement('a'); a.href = u; a.download = 'mapa.png'; a.click(); };
   document.getElementById('map-report').onclick = async ()=>{ const u = await svgToPngDataURL(mapStaticSvg(R.points)); addToReport({type:'chart', title, imageDataURL: u, citation: `Registros por lugar (${R.how}). ${modelNote(ds, '')} Cartografía: Natural Earth. Elaborado con "${APP_LABEL}" el ${new Date().toLocaleString('es-AR')}.`}); };
@@ -8440,6 +8805,9 @@ function setupHelp(){
   });
 }
 const GLOSSARY = [
+  ['diccionario','Codificación por diccionario','Reglas del tipo "Despidos: despid*, cesant*" que proponen un código para cada oración donde aparece alguna de esas palabras (el asterisco incluye todas las terminaciones; las comillas, una frase exacta). Sirve para codificar rápido temas que se nombran de forma explícita, no para interpretar. Antes de aplicar, conviene compararlas con una parte ya codificada a mano: si el kappa es bajo, las reglas no reproducen el criterio y hay que ajustarlas. Las propuestas siempre se revisan antes de aplicarse.'],
+  ['redpalabras','Red de palabras','Muestra qué palabras aparecen juntas en las mismas oraciones, entre las más frecuentes. Los grupos de palabras muy conectadas suelen corresponder a temas; las palabras con intermediación alta conectan temas distintos. Es exploratoria: orienta la lectura, no la reemplaza.'],
+  ['extraccion','Pasar relatos a una base (propuesta asistida)','Telar lee cada relato y propone un registro usando solo las categorías que ya tiene la base. Reconoce cada categoría por su nombre, por las raíces de sus palabras y por sinónimos (editables); las formas compuestas se arman por partes ("Huelga y Piquete (Planta)"). Si un campo no aparece en el texto, usa lo que la base sabe (por ejemplo, la localidad habitual de una empresa) o el valor habitual de la columna, y lo indica con otro color. Los nombres de categorías que aparecen en casi todos los relatos no se usan para distinguir. "Medir con mis datos" compara la propuesta con los registros ya cargados de la misma fecha. Es una ayuda para cargar más rápido: cada registro se revisa antes de sumarlo.'],
   ['ciclos','Indicadores: picos, ciclos y estacionalidad','Un pico es un período (mes, trimestre o año) cuyo valor supera el promedio en más de un número fijo de desvíos estándar (1,5 por defecto). Un ciclo es un tramo de períodos seguidos por encima de la mediana (o del promedio): dos o más por defecto; en el estudio del conflicto social se lo llama ciclo de protesta. El índice estacional compara el promedio de cada mes (o trimestre) del año con el promedio general: mayor que 1, una época de más actividad. Ajustar por estacionalidad resta ese efecto, para que un pico no sea solo la época del año. La diversidad (equidad de Pielou) va de 0 (una sola categoría) a 1 (todas con el mismo peso). Son criterios descriptivos y explícitos, que no reemplazan el análisis de cada momento.'],
   ['red','Red de actores y centralidad','Representa qué actores aparecen juntos en los mismos hechos o relatos. El grado es la cantidad de actores distintos con los que se vincula cada uno; el grado ponderado suma cuántas veces aparecen juntos; la intermediación mide cuánto un actor está en el camino entre otros que no se vinculan directamente: los actores con intermediación alta funcionan como puentes. La red muestra co-apariciones, no necesariamente alianzas.'],
   ['keyness','Palabras características (log-verosimilitud)','Las palabras que un grupo de textos usa proporcionalmente más que el resto (por ejemplo, las que distinguen a un tópico o a una entrevista). Se miden con la log-verosimilitud (G²), que compara la frecuencia en el grupo con la del resto: con G² mayor que 3,84 la diferencia es significativa (p < 0,05). Muestran de qué se habla en cada grupo, pero no reemplazan la lectura de los textos.'],
