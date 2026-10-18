@@ -236,8 +236,8 @@ tbody tr:hover{background:var(--accent-bg)}
       <button class="mode-btn" data-mode="cross">Tabla cruzada</button>
       <button class="mode-btn" data-mode="quality">Calidad de datos</button>
       <button class="mode-btn" data-mode="net">Red de actores</button>
-      <select id="mode-more" class="mode-more" aria-label="Más análisis"><option value="">Más análisis</option><option value="timeline">Línea de tiempo</option><option value="cmp">Comparar grupos</option><option value="reg">Regresión</option><option value="conf">Conflictividad</option></select>
-      <span class="mode-in-menu"><button class="mode-btn" data-mode="timeline">Línea de tiempo</button><button class="mode-btn" data-mode="cmp">Comparar grupos</button><button class="mode-btn" data-mode="reg">Regresión</button><button class="mode-btn" data-mode="conf">Conflictividad</button></span>
+      <select id="mode-more" class="mode-more" aria-label="Más análisis"><option value="">Más análisis</option><option value="timeline">Línea de tiempo</option><option value="cmp">Comparar grupos</option><option value="reg">Regresión</option><option value="conf">Indicadores</option></select>
+      <span class="mode-in-menu"><button class="mode-btn" data-mode="timeline">Línea de tiempo</button><button class="mode-btn" data-mode="cmp">Comparar grupos</button><button class="mode-btn" data-mode="reg">Regresión</button><button class="mode-btn" data-mode="conf">Indicadores</button></span>
       </div>
       <div class="modebar-opts">
       <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;color:var(--sub);cursor:pointer">
@@ -343,12 +343,23 @@ tbody tr:hover{background:var(--accent-bg)}
     </div>
 
     <div id="conf-view" style="display:none">
-      <p class="hint helptext">Indicadores de conflictividad de la base: cantidad de conflictos por período, picos y ciclos de protesta, actores activos y cambios en el repertorio (las formas de protesta). Usa los filtros activos.</p>
+      <p class="hint helptext">Evolución de cualquier base con fecha o año (conflictos, noticias, desembarques, consultas…): cantidad de registros, o suma o promedio de una columna, por período; picos, ciclos y estacionalidad; actores activos y composición (por ejemplo, formas de protesta, temas o especies). Los criterios se ajustan en "Criterios". Usa los filtros activos.</p>
       <div class="adv-controls">
+        <div class="field"><label>Cada registro es (en plural)</label><input type="text" id="conf-unit" placeholder="conflictos, noticias…" style="width:150px"></div>
+        <div class="field"><label>Medir</label><select id="conf-measure"></select></div>
         <div class="field"><label>Período</label><select id="conf-gran"></select></div>
         <div class="field"><label>Actores (opcional)</label><select id="conf-actor"></select></div>
-        <div class="field"><label>Repertorio: formas de protesta (opcional)</label><select id="conf-form"></select></div>
+        <div class="field"><label>Composición: tipos, formas, temas… (opcional)</label><select id="conf-form"></select></div>
       </div>
+      <details style="margin:0 0 10px"><summary style="cursor:pointer;font-size:.88rem"><strong>Criterios</strong> de picos, ciclos y estacionalidad</summary>
+        <div class="adv-controls" style="margin-top:6px">
+          <div class="field"><label>Pico: más de … desvíos sobre el promedio</label><input type="number" id="conf-k" min="0.5" max="4" step="0.1" style="width:90px"></div>
+          <div class="field"><label>Ciclo: … o más períodos seguidos</label><input type="number" id="conf-len" min="2" max="24" step="1" style="width:90px"></div>
+          <div class="field"><label>por encima de</label><select id="conf-ref"><option value="median">la mediana</option><option value="mean">el promedio</option></select></div>
+          <label class="chk-opt" id="conf-seas-wrap" style="align-self:flex-end"><input type="checkbox" id="conf-seas"> Ajustar por estacionalidad</label>
+        </div>
+        <p class="hint" style="margin:4px 0 0">Valores habituales: 1,5 desvíos; 2 períodos; la mediana. Los criterios se guardan con el proyecto y quedan en el anexo metodológico.</p>
+      </details>
       <div id="conf-out"></div>
     </div>
 
@@ -629,7 +640,7 @@ tbody tr:hover{background:var(--accent-bg)}
 
 <script>
 // ===== Versión de Telar (al publicar una nueva, cambiar acá y en sw.js) =====
-const APP_VERSION = '0.13.1';
+const APP_VERSION = '0.13.2';
 const APP_CHANNEL = 'beta';
 const APP_LABEL = 'Telar ' + APP_VERSION + ' ' + APP_CHANNEL;
 // Dirección del formulario de comentarios (ej. un Formulario de Google). Vacía: se explica cómo configurarla.
@@ -889,7 +900,8 @@ document.getElementById('mm-src').addEventListener('change', setupMindControls);
 document.getElementById('mm-ds').addEventListener('change', setupMindControls);
 document.getElementById('mm-term').addEventListener('keydown', e=>{ if(e.key==='Enter') runMind(false); });
 ['net-src','net-min'].forEach(id=>document.getElementById(id).addEventListener('change', renderNet));
-['conf-gran','conf-actor','conf-form'].forEach(id=>document.getElementById(id).addEventListener('change', renderConf));
+['conf-gran','conf-actor','conf-form','conf-measure'].forEach(id=>document.getElementById(id).addEventListener('change', renderConf));
+['conf-unit','conf-k','conf-len','conf-ref','conf-seas'].forEach(id=>document.getElementById(id).addEventListener('change', saveConfSettings));
 ['wa-mode','wa-source'].forEach(id=>document.getElementById(id).addEventListener('change', waControls));
 document.getElementById('wa-term').addEventListener('keydown', e=>{ if(e.key==='Enter') runWords(); });
 ['cmp-design','cmp-y','cmp-method'].forEach(id=>document.getElementById(id).addEventListener('change', updateCmpControls));
@@ -3327,7 +3339,8 @@ function buildAnnexHtml(){
   h += '<li>Valores con varias partes: la coma, la barra y el guion con espacios separan siempre; la conjunción "y" separa solo si todas las partes aparecen como valores sueltos en otras celdas de la misma columna.</li>';
   { const der = Object.values(datasets).flatMap(d=>(d.derived||[]).map(x=>Object.assign({base: d.label}, x)));
     if(der.length) h += `<li>Índices construidos: ${der.map(x=>`«${esc(x.name)}» en «${esc(x.base)}» (${x.method==='mean' ? 'promedio' : 'suma'} de ${esc(x.items.join(', '))}; alfa de Cronbach = ${fmtN(x.alpha,3)}, ${x.n} casos con todas las preguntas respondidas)`).join('; ')}. Los casos con alguna pregunta sin responder quedan sin valor en el índice.</li>`; }
-  if(methodLog.some(e=>/Indicadores de conflictividad/.test(e.text || e.msg || ''))) h += `<li>Indicadores de conflictividad: un pico es un período con más conflictos que el promedio más 1,5 desvíos estándar; un ciclo de protesta, un tramo de dos o más períodos seguidos por encima de la mediana; la diversidad del repertorio se mide con la equidad de Pielou (entropía de Shannon de las formas de protesta del período, dividida por su máximo posible). Los períodos sin registros se cuentan con cero.</li>`;
+  if(methodLog.some(e=>/^Indicadores por /.test(e.text || ''))){ const S = indSettings();
+    h += `<li>Indicadores por período: se cuenta la cantidad de registros (o la suma o el promedio de una columna numérica) de cada período; los períodos sin registros cuentan como cero (en promedios, sin dato). Un pico es un período que supera el promedio en más de ${fmtN(S.k,1)} desvíos estándar; un ciclo, un tramo de ${S.minLen} o más períodos seguidos por encima de ${S.ref==='mean' ? 'el promedio' : 'la mediana'}${S.seasonal ? ', ambos calculados sobre la serie ajustada por estacionalidad (valor del período menos el promedio de su mes o trimestre del año, más el promedio general)' : ''}. El índice estacional es el promedio de cada mes (o trimestre) del año dividido por el promedio general. La diversidad de la composición se mide con la equidad de Pielou (entropía de Shannon dividida por su máximo posible).</li>`; }
   if(methodLog.some(e=>e.kind==='texto')) h += `<li>Análisis de palabras: el texto se divide en palabras (secuencias de letras, en minúsculas, sin lematizar), excluyendo las palabras vacías del español según una lista fija de ${STOP_ES.size} palabras cuando se indica. Las palabras características de cada grupo se identifican por log-verosimilitud (G², Rayson y Garside, 2000), comparando su frecuencia en el grupo con la del resto de los textos; se listan las que aparecen al menos 3 veces y proporcionalmente más en el grupo.</li>`;
   { const nOcr = Object.values(qualDocs).reduce((s,d)=>s+d.entries.filter(e=>e.ocr).length, 0);
     if(nOcr) h += `<li>Transcripción por OCR: ${nOcr} relato(s) se obtuvieron de imágenes (fotos, capturas o PDF escaneados) con ${OCR_ENGINE}, procesando por separado las zonas de texto marcadas en orden de lectura y descartando los renglones de baja confianza; el texto se revisó y corrigió manualmente antes de guardarlo. Cada relato conserva la referencia a su imagen de origen.</li>`; }
@@ -5253,7 +5266,13 @@ function runMind(keepCollapsed){
 }
 /* ===== MAPAS MENTALES (fin) ===== */
 
-/* ===== CONFLICTIVIDAD: indicadores, picos y ciclos (inicio) ===== */
+/* ===== INDICADORES: evolución, picos, ciclos y estacionalidad (inicio) ===== */
+// Sirve para cualquier base con fecha o año: conflictos, noticias, desembarques, consultas… Cada proyecto elige cómo se llaman
+// sus registros, qué se mide (cantidad, suma o promedio de una columna) y los criterios de picos y ciclos.
+function indSettings(){ project.indicators = Object.assign({unit:'', k:1.5, minLen:2, ref:'median', seasonal:false}, project.indicators||{}); return project.indicators; }
+function indDefaultUnit(ds){ const txt = catColumns(ds).map(c=>normColName(c)).join(' ') + ' ' + normColName(ds.label||''); return /forma|protesta|conflict|organiz|sindic|repertorio|huelga/.test(txt) ? 'conflictos' : 'registros'; }
+function isConflictUnit(u){ return /conflict|protest|huelga/i.test(u||''); }
+function indVoc(unit){ const c = isConflictUnit(unit); return {unit, cycles: c ? 'Ciclos de protesta' : 'Ciclos', comp: c ? 'Repertorio' : 'Composición', compOf: c ? 'formas de protesta' : 'categorías'}; }
 function confPeriodOf(ds, r, gran){
   if(gran==='anio') return r.__Año!=null ? String(r.__Año) : null;
   const d = ds.dateCol ? r[ds.dateCol] : null; return d instanceof Date ? periodKey(d, gran) : null;
@@ -5263,37 +5282,61 @@ function confFill(keys, gran){
   if(gran==='anio'){ const ys = keys.map(Number), out = []; for(let y=Math.min(...ys); y<=Math.max(...ys); y++) out.push(String(y)); return out; }
   return fillPeriods(keys, gran);
 }
-function conflictIndicators(ds, rows, gran, actorCol, formCol){
+function seasonOf(k, gran){ return gran==='mes' ? +k.slice(5,7) : gran==='trimestre' ? +k.slice(-1) : null; }
+// opts: {measure: 'count' | 'sum:columna' | 'mean:columna', k: desvíos para un pico, minLen: períodos para un ciclo, ref: 'median'|'mean', seasonal: bool}
+function conflictIndicators(ds, rows, gran, actorCol, formCol, opts={}){
+  const measure = opts.measure || 'count', K = opts.k!=null ? +opts.k : 1.5, minLen = Math.max(2, opts.minLen || 2), ref = opts.ref || 'median';
+  const agg = measure.split(':')[0], numCol = agg==='count' ? null : measure.slice(measure.indexOf(':')+1);
   const per = new Map(), allForms = new Map(); let undated = 0;
   rows.forEach(r=>{
     const k = confPeriodOf(ds, r, gran); if(!k){ undated++; return; }
-    if(!per.has(k)) per.set(k, {n:0, actors:new Set(), forms:new Map()}); const p = per.get(k); p.n++;
+    if(!per.has(k)) per.set(k, {n:0, sum:0, cnt:0, actors:new Set(), forms:new Map()}); const p = per.get(k); p.n++;
+    if(numCol){ const v = r[numCol]; if(typeof v==='number' && isFinite(v)){ p.sum += v; p.cnt++; } }
     if(actorCol) getCategories(ds, r, actorCol).forEach(a=>{ if(a!=='(sin dato)') p.actors.add(a); });
     if(formCol) getCategories(ds, r, formCol).forEach(f=>{ if(f!=='(sin dato)'){ p.forms.set(f, (p.forms.get(f)||0)+1); allForms.set(f, (allForms.get(f)||0)+1); } });
   });
   const keys = confFill([...per.keys()], gran);
-  const series = keys.map(k=>{ const p = per.get(k) || {n:0, actors:new Set(), forms:new Map()}; return {k, n: p.n, actors: p.actors.size, forms: p.forms}; });
-  const ns = series.map(s=>s.n), N = ns.length, mean = ns.reduce((a,b)=>a+b,0)/Math.max(1,N);
-  const sd = N>1 ? Math.sqrt(ns.reduce((a,b)=>a+(b-mean)*(b-mean),0)/(N-1)) : 0;
-  const sorted = ns.slice().sort((a,b)=>a-b), median = N ? (N%2 ? sorted[(N-1)/2] : (sorted[N/2-1]+sorted[N/2])/2) : 0;
-  const kForms = allForms.size;
+  const series = keys.map(k=>{ const p = per.get(k) || {n:0, sum:0, cnt:0, actors:new Set(), forms:new Map()};
+    const value = agg==='count' ? p.n : agg==='sum' ? p.sum : (p.cnt ? p.sum/p.cnt : null);
+    return {k, records: p.n, n: value, actors: p.actors.size, forms: p.forms}; });
+  // estacionalidad: promedio de cada mes (o trimestre) del año; la serie ajustada resta ese efecto
+  let profile = null;
+  const valid = series.filter(s=>s.n!=null);
+  const overall = valid.reduce((a,s)=>a+s.n,0)/Math.max(1,valid.length);
+  if(gran!=='anio' && valid.length){
+    const by = new Map(); valid.forEach(s=>{ const q = seasonOf(s.k, gran); if(!by.has(q)) by.set(q, []); by.get(q).push(s.n); });
+    const L = gran==='mes' ? 12 : 4;
+    profile = Array.from({length:L}, (_,i)=>{ const v = by.get(i+1) || []; const m = v.length ? v.reduce((a,b)=>a+b,0)/v.length : null; return {season: i+1, mean: m, years: v.length, index: m!=null && overall ? m/overall : null}; });
+    series.forEach(s=>{ const pr = profile[seasonOf(s.k, gran)-1]; s.adj = s.n==null || pr.mean==null ? null : s.n - pr.mean + overall; });
+  }
+  const useAdj = !!(opts.seasonal && profile);
+  series.forEach(s=>{ s.v = useAdj ? s.adj : s.n; });
+  const vs = series.filter(s=>s.v!=null).map(s=>s.v), N = vs.length;
+  const mean = vs.reduce((a,b)=>a+b,0)/Math.max(1,N);
+  const sd = N>1 ? Math.sqrt(vs.reduce((a,b)=>a+(b-mean)*(b-mean),0)/(N-1)) : 0;
+  const sorted = vs.slice().sort((a,b)=>a-b), median = N ? (N%2 ? sorted[(N-1)/2] : (sorted[N/2-1]+sorted[N/2])/2) : 0;
+  const thr = ref==='mean' ? mean : median, kForms = allForms.size;
   series.forEach(s=>{
-    s.peak = s.n>0 && s.n > mean + 1.5*sd;
+    s.peak = s.v!=null && (agg!=='count' || s.n>0) && s.v > mean + K*sd;
     const tot = [...s.forms.values()].reduce((a,b)=>a+b,0);
     s.pielou = (formCol && tot>0 && kForms>1) ? -[...s.forms.values()].reduce((h,c)=>h + (c/tot)*Math.log(c/tot), 0)/Math.log(kForms) : null;
     s.topForm = tot ? [...s.forms.entries()].sort((a,b)=>b[1]-a[1])[0][0] : '';
   });
-  // ciclos: dos o más períodos seguidos por encima de la mediana
   const cycles = []; let cur = null;
-  series.forEach((s,i)=>{ if(s.n > median){ if(!cur) cur = {from:i, to:i}; else cur.to = i; } else { if(cur && cur.to>cur.from) cycles.push(cur); cur = null; } });
-  if(cur && cur.to>cur.from) cycles.push(cur);
-  cycles.forEach(c=>{ const seg = series.slice(c.from, c.to+1); c.len = seg.length; c.total = seg.reduce((a,b)=>a+b.n,0); const pk = seg.reduce((m,x)=>x.n>m.n?x:m, seg[0]); c.peakK = pk.k; c.peakN = pk.n; c.fromK = series[c.from].k; c.toK = series[c.to].k; });
+  const close = ()=>{ if(cur && cur.to-cur.from+1 >= minLen) cycles.push(cur); cur = null; };
+  series.forEach((s,i)=>{ if(s.v!=null && s.v > thr){ if(!cur) cur = {from:i, to:i}; else cur.to = i; } else close(); });
+  close();
+  cycles.forEach(c=>{ const seg = series.slice(c.from, c.to+1); c.len = seg.length;
+    const vals = seg.map(x=>x.n).filter(v=>v!=null); c.total = agg==='mean' ? vals.reduce((a,b)=>a+b,0)/vals.length : vals.reduce((a,b)=>a+b,0);
+    const pk = seg.reduce((m,x)=>(x.n!=null && (m.n==null || x.n>m.n)) ? x : m, seg[0]); c.peakK = pk.k; c.peakN = pk.n; c.fromK = series[c.from].k; c.toK = series[c.to].k; });
   series.forEach((s,i)=>{ s.inCycle = cycles.some(c=>i>=c.from && i<=c.to); });
-  return {series, mean, sd, median, cycles, undated, total: rows.length - undated, forms: [...allForms.entries()].sort((a,b)=>b[1]-a[1])};
+  return {series, mean, sd, median, thr, cycles, undated, total: rows.length - undated, forms: [...allForms.entries()].sort((a,b)=>b[1]-a[1]), profile, agg, numCol, K, minLen, ref, seasonal: useAdj};
 }
 const CONF_GRAN = {mes:'mes', trimestre:'trimestre', anio:'año'};
+const PLURAL_GRAN = {mes:'meses', trimestre:'trimestres', anio:'años'};
 function setupConfControls(){
   const ds = datasets[active]; if(!ds) return;
+  const S = indSettings();
   const g = document.getElementById('conf-gran'), pv = g.value;
   g.innerHTML = (ds.dateCol ? '<option value="mes">Mes</option><option value="trimestre">Trimestre</option>' : '') + '<option value="anio">Año</option>';
   if([...g.options].some(o=>o.value===pv)) g.value = pv; else g.value = ds.dateCol ? 'mes' : 'anio';
@@ -5301,48 +5344,79 @@ function setupConfControls(){
   ['conf-actor','conf-form'].forEach((id, i)=>{ const s = document.getElementById(id), p = s.value; s.innerHTML = '<option value="">— ninguna —</option>' + cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
     const first = s.dataset.ds!==active; s.dataset.ds = active; // la primera vez que se abre cada base, se sugieren las columnas
     if(!first && [...s.options].some(o=>o.value===p)) s.value = p; else { const guess = cats.find(c=>i===0 ? /organiz|actor|sindic|gremio|protagon/i.test(c) : /forma|repertorio|tipo de acci|accion|medida/i.test(c)); s.value = guess || ''; } });
+  const m = document.getElementById('conf-measure'), pm = m.value, nums = numColumns(ds);
+  m.innerHTML = '<option value="count">Cantidad de registros</option>' + nums.map(c=>`<option value="sum:${esc(c)}">Suma de ${esc(c)}</option><option value="mean:${esc(c)}">Promedio de ${esc(c)}</option>`).join('');
+  m.value = [...m.options].some(o=>o.value===pm) ? pm : 'count';
+  const u = document.getElementById('conf-unit');
+  if(u.dataset.ds!==active){ u.dataset.ds = active; u.value = S.unit || indDefaultUnit(ds); }
+  document.getElementById('conf-k').value = S.k; document.getElementById('conf-len').value = S.minLen; document.getElementById('conf-ref').value = S.ref;
+  document.getElementById('conf-seas').checked = !!S.seasonal; document.getElementById('conf-seas-wrap').style.display = g.value==='anio' ? 'none' : '';
+}
+function saveConfSettings(){
+  const S = indSettings();
+  S.unit = document.getElementById('conf-unit').value.trim() || 'registros';
+  S.k = Math.max(0.5, Math.min(4, +String(document.getElementById('conf-k').value).replace(',','.') || 1.5));
+  S.minLen = Math.max(2, Math.min(24, Math.round(+document.getElementById('conf-len').value) || 2));
+  S.ref = document.getElementById('conf-ref').value === 'mean' ? 'mean' : 'median';
+  S.seasonal = document.getElementById('conf-seas').checked;
+  persistSession(); renderConf();
 }
 function renderConf(){
   setupConfControls();
   const ds = datasets[active], out = document.getElementById('conf-out'); if(!ds) return;
-  const gran = document.getElementById('conf-gran').value, actorCol = document.getElementById('conf-actor').value, formCol = document.getElementById('conf-form').value;
-  if(!ds.dateCol && !ds.rows.some(r=>r.__Año!=null)){ out.innerHTML = '<p class="empty">Para los indicadores de conflictividad hace falta una columna de fecha o de año.</p>'; return; }
-  const R = conflictIndicators(ds, getFiltered(), gran, actorCol, formCol);
+  const S = indSettings(), gran = document.getElementById('conf-gran').value, actorCol = document.getElementById('conf-actor').value, formCol = document.getElementById('conf-form').value, measure = document.getElementById('conf-measure').value;
+  const unit = document.getElementById('conf-unit').value.trim() || 'registros', V = indVoc(unit);
+  if(!ds.dateCol && !ds.rows.some(r=>r.__Año!=null)){ out.innerHTML = '<p class="empty">Para los indicadores hace falta una columna de fecha o de año.</p>'; return; }
+  const R = conflictIndicators(ds, getFiltered(), gran, actorCol, formCol, {measure, k: S.k, minLen: S.minLen, ref: S.ref, seasonal: S.seasonal && gran!=='anio'});
   if(!R.series.length){ out.innerHTML = '<p class="empty">No hay registros con fecha en los filtros actuales.</p>'; return; }
-  const lab = k=>gran==='anio' ? k : periodLabel(k), unit = CONF_GRAN[gran];
-  const peaks = R.series.filter(s=>s.peak), maxS = R.series.reduce((m,s)=>s.n>m.n?s:m, R.series[0]);
-  let html = `<p style="margin:6px 0">${R.total} conflictos en ${R.series.length} ${unit==='mes' ? 'meses' : unit==='año' ? 'años' : 'trimestres'} (${lab(R.series[0].k)} a ${lab(R.series[R.series.length-1].k)}): <strong>${fmtN(R.mean,1)}</strong> por ${unit} en promedio, mediana ${fmtN(R.median,1)}. Máximo: <strong>${maxS.n}</strong> en ${lab(maxS.k)}.${R.undated ? ` ${R.undated} registros sin fecha no se cuentan.` : ''}</p>
+  const lab = k=>gran==='anio' ? k : periodLabel(k), per1 = CONF_GRAN[gran], perN = PLURAL_GRAN[gran];
+  const what = R.agg==='count' ? unit : (R.agg==='sum' ? 'suma de "'+R.numCol+'"' : 'promedio de "'+R.numCol+'"');
+  const fmtV = v=>v==null ? '—' : (R.agg==='count' ? String(v) : numFmt(v));
+  const withV = R.series.filter(s=>s.n!=null), maxS = withV.reduce((m,s)=>s.n>m.n?s:m, withV[0]);
+  const peaks = R.series.filter(s=>s.peak);
+  const refTxt = R.ref==='mean' ? 'el promedio' : 'la mediana', basis = R.seasonal ? ' en la serie ajustada por estacionalidad' : '';
+  let html = `<p style="margin:6px 0">${R.total} ${esc(unit)} en ${R.series.length} ${perN} (${lab(R.series[0].k)} a ${lab(R.series[R.series.length-1].k)}). ${R.agg==='count' ? '' : 'Medida: <strong>'+esc(what)+'</strong>. '}Promedio por ${per1}: <strong>${numFmt(R.mean)}</strong>${R.seasonal ? ' (serie ajustada)' : ''}; mediana ${numFmt(R.median)}. Máximo: <strong>${fmtV(maxS.n)}</strong> en ${lab(maxS.k)}.${R.undated ? ` ${R.undated} registros sin fecha no se cuentan.` : ''}</p>
     <div class="chart-box" style="height:300px"><canvas id="c-conf"></canvas></div>
-    <p class="hint" style="margin:4px 0 10px">Barras oscuras: períodos dentro de un ciclo de protesta. En terracota: picos (más de 1,5 desvíos por encima del promedio). Línea: la mediana. ${glLink('ciclos','¿Cómo se definen picos y ciclos?')}</p>`;
-  html += R.cycles.length ? `<p style="margin:10px 0 4px"><strong>Ciclos de protesta</strong> (${R.cycles.length}): tramos de dos o más ${unit==='mes' ? 'meses' : unit==='año' ? 'años' : 'trimestres'} seguidos por encima de la mediana.</p><div class="tablewrap"><table><thead><tr><th>Desde</th><th>Hasta</th><th>Duración</th><th>Conflictos</th><th>Momento más alto</th></tr></thead><tbody>${R.cycles.map(c=>`<tr><td>${lab(c.fromK)}</td><td>${lab(c.toK)}</td><td>${c.len}</td><td>${c.total}</td><td>${lab(c.peakK)} (${c.peakN})</td></tr>`).join('')}</tbody></table></div>` : `<p class="hint">No hay ciclos: ningún tramo de dos o más períodos seguidos supera la mediana.</p>`;
-  if(peaks.length) html += `<p style="margin:10px 0 4px"><strong>Picos:</strong> ${peaks.map(s=>`${lab(s.k)} (${s.n})`).join(', ')}.</p>`;
-  const rowsT = R.series.length>60 ? R.series.filter(s=>s.n>0) : R.series;
-  html += `<details style="margin-top:10px"><summary style="cursor:pointer"><strong>Indicadores por ${unit}</strong></summary><div class="tablewrap" style="margin-top:6px"><table><thead><tr><th>Período</th><th>Conflictos</th>${actorCol ? '<th>Actores distintos</th>' : ''}${formCol ? '<th>Forma principal</th><th>Diversidad del repertorio</th>' : ''}</tr></thead><tbody>${rowsT.map(s=>`<tr${s.peak ? ' style="background:rgba(181,83,60,.08)"' : ''}><td>${lab(s.k)}</td><td>${s.n}</td>${actorCol ? `<td>${s.actors}</td>` : ''}${formCol ? `<td>${esc(s.topForm)}</td><td>${s.pielou==null ? '—' : fmtN(s.pielou,2)}</td>` : ''}</tr>`).join('')}</tbody></table></div></details>`;
-  if(formCol && R.forms.length){
-    html += `<p style="margin:12px 0 4px"><strong>Repertorio a lo largo del tiempo</strong> ("${esc(formCol)}"): peso de cada forma en cada período. La diversidad (equidad de Pielou) va de 0 (una sola forma) a 1 (todas con el mismo peso).</p><div class="chart-box" style="height:300px"><canvas id="c-conf-rep"></canvas></div>`;
+    <p class="hint" style="margin:4px 0 10px">Barras oscuras: períodos dentro de un ${V.cycles==='Ciclos' ? 'ciclo' : 'ciclo de protesta'}. En terracota: picos (más de ${fmtN(R.K,1)} desvíos por encima del promedio${basis}). Línea: ${refTxt}${R.seasonal ? ' de la serie ajustada' : ''}. ${glLink('ciclos','¿Cómo se definen picos y ciclos?')}</p>`;
+  html += R.cycles.length ? `<p style="margin:10px 0 4px"><strong>${V.cycles}</strong> (${R.cycles.length}): tramos de ${R.minLen} o más ${perN} seguidos por encima de ${refTxt}${basis}.</p><div class="tablewrap"><table><thead><tr><th>Desde</th><th>Hasta</th><th>Duración</th><th>${R.agg==='mean' ? 'Promedio del tramo' : R.agg==='sum' ? 'Suma' : esc(unit.charAt(0).toUpperCase()+unit.slice(1))}</th><th>Momento más alto</th></tr></thead><tbody>${R.cycles.map(c=>`<tr><td>${lab(c.fromK)}</td><td>${lab(c.toK)}</td><td>${c.len}</td><td>${fmtV(c.total)}</td><td>${lab(c.peakK)} (${fmtV(c.peakN)})</td></tr>`).join('')}</tbody></table></div>` : `<p class="hint">No hay ciclos: ningún tramo de ${R.minLen} o más ${perN} seguidos supera ${refTxt}.</p>`;
+  if(peaks.length) html += `<p style="margin:10px 0 4px"><strong>Picos:</strong> ${peaks.map(s=>`${lab(s.k)} (${fmtV(s.n)})`).join(', ')}.</p>`;
+  if(R.profile){
+    const names = gran==='mes' ? MESES : ['1.er trimestre','2.º trimestre','3.er trimestre','4.º trimestre'];
+    html += `<p style="margin:12px 0 4px"><strong>Estacionalidad</strong>: promedio de cada ${gran==='mes' ? 'mes' : 'trimestre'} del año, comparado con el promedio general (índice 1 = un ${per1} típico).${R.seasonal ? ' Los picos y ciclos se calculan sobre la serie ajustada: sin el efecto de la época del año.' : ' Para calcular picos y ciclos sin el efecto de la época del año, activá "Ajustar por estacionalidad" en los criterios.'}</p><div class="chart-box" style="height:200px"><canvas id="c-conf-seas"></canvas></div>`;
   }
+  const rowsT = R.series.length>60 ? R.series.filter(s=>s.records>0) : R.series;
+  html += `<details style="margin-top:10px"><summary style="cursor:pointer"><strong>Indicadores por ${per1}</strong></summary><div class="tablewrap" style="margin-top:6px"><table><thead><tr><th>Período</th><th>${R.agg==='count' ? esc(unit.charAt(0).toUpperCase()+unit.slice(1)) : esc(what.charAt(0).toUpperCase()+what.slice(1))}</th>${R.seasonal ? '<th>Ajustado</th>' : ''}${actorCol ? '<th>Actores distintos</th>' : ''}${formCol ? `<th>${V.comp==='Repertorio' ? 'Forma principal' : 'Categoría principal'}</th><th>Diversidad</th>` : ''}</tr></thead><tbody>${rowsT.map(s=>`<tr${s.peak ? ' style="background:rgba(181,83,60,.08)"' : ''}><td>${lab(s.k)}</td><td>${fmtV(s.n)}</td>${R.seasonal ? `<td>${s.adj==null ? '—' : numFmt(s.adj)}</td>` : ''}${actorCol ? `<td>${s.actors}</td>` : ''}${formCol ? `<td>${esc(s.topForm)}</td><td>${s.pielou==null ? '—' : fmtN(s.pielou,2)}</td>` : ''}</tr>`).join('')}</tbody></table></div></details>`;
+  if(formCol && R.forms.length) html += `<p style="margin:12px 0 4px"><strong>${V.comp} a lo largo del tiempo</strong> ("${esc(formCol)}"): peso de cada ${V.comp==='Repertorio' ? 'forma' : 'categoría'} en cada período. La diversidad (equidad de Pielou) va de 0 (una sola) a 1 (todas con el mismo peso).</p><div class="chart-box" style="height:300px"><canvas id="c-conf-rep"></canvas></div>`;
   html += `<div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="mini-export" id="conf-report">📌 Agregar al informe</button><button type="button" class="mini-export" id="conf-xlsx">⭳ Excel</button></div>`;
   out.innerHTML = html;
   destroyChart('c-conf');
   charts['c-conf'] = new Chart(document.getElementById('c-conf'), {type:'bar', data:{labels: R.series.map(s=>lab(s.k)), datasets:[
-    {type:'line', label:'Mediana', data: R.series.map(()=>R.median), borderColor:'#16232E', borderWidth:1.5, borderDash:[5,4], pointRadius:0},
-    {label:'Conflictos', data: R.series.map(s=>s.n), backgroundColor: R.series.map(s=>s.peak ? '#B5533C' : s.inCycle ? '#1F4C4E' : '#9DBDBE')}]},
-    options:{maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, title:{display:true, text:'Conflictos'}}}}});
+    {type:'line', label: R.ref==='mean' ? 'Promedio' : 'Mediana', data: R.series.map(()=>R.thr), borderColor:'#16232E', borderWidth:1.5, borderDash:[5,4], pointRadius:0},
+    {label: R.seasonal ? 'Ajustado' : what, data: R.series.map(s=>s.v), backgroundColor: R.series.map(s=>s.peak ? '#B5533C' : s.inCycle ? '#1F4C4E' : '#9DBDBE')}]},
+    options:{maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero: R.agg!=='mean', title:{display:true, text: (R.seasonal ? 'Ajustado: ' : '') + what}}}}});
+  if(R.profile){
+    destroyChart('c-conf-seas');
+    const names = gran==='mes' ? MESES_CORTOS : ['T1','T2','T3','T4'];
+    charts['c-conf-seas'] = new Chart(document.getElementById('c-conf-seas'), {type:'bar', data:{labels: names, datasets:[{label:'Índice estacional', data: R.profile.map(p=>p.index==null ? null : Math.round(p.index*100)/100), backgroundColor: R.profile.map(p=>p.index!=null && p.index>1 ? '#B5533C' : '#9DBDBE')}]},
+      options:{maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, title:{display:true, text:'Índice (1 = promedio)'}}}}});
+  }
   if(formCol && R.forms.length){
-    const top = R.forms.slice(0, 6).map(f=>f[0]), other = R.forms.length>6;
-    const ser = R.series.filter(s=>s.n>0);
+    const top = R.forms.slice(0, 6).map(f=>f[0]), other = R.forms.length>6, ser = R.series.filter(s=>s.records>0);
     destroyChart('c-conf-rep');
     charts['c-conf-rep'] = new Chart(document.getElementById('c-conf-rep'), {type:'bar', data:{labels: ser.map(s=>lab(s.k)), datasets: top.map((f,i)=>({label:f, data: ser.map(s=>{ const t = [...s.forms.values()].reduce((a,b)=>a+b,0); return t ? 100*(s.forms.get(f)||0)/t : 0; }), backgroundColor: GRAPH_COLORS[i%GRAPH_COLORS.length]})).concat(other ? [{label:'Otras', data: ser.map(s=>{ const t = [...s.forms.values()].reduce((a,b)=>a+b,0); return t ? 100*[...s.forms.entries()].filter(([f])=>!top.includes(f)).reduce((a,[,c])=>a+c,0)/t : 0; }), backgroundColor:'#C7D0CD'}] : [])},
-      options:{maintainAspectRatio:false, scales:{x:{stacked:true}, y:{stacked:true, max:100, title:{display:true, text:'% de las formas de protesta'}}}, plugins:{legend:{position:'bottom'}}}});
+      options:{maintainAspectRatio:false, scales:{x:{stacked:true}, y:{stacked:true, max:100, title:{display:true, text:'% de '+V.compOf}}}, plugins:{legend:{position:'bottom'}}}});
   }
-  const title = `Conflictividad por ${unit}: ${ds.label}`, note = `Picos: períodos con más de promedio + 1,5 desvíos (${fmtN(R.mean + 1.5*R.sd,1)} conflictos). Ciclos: dos o más períodos seguidos por encima de la mediana (${fmtN(R.median,1)}).${formCol ? ' Diversidad del repertorio: equidad de Pielou sobre "'+formCol+'".' : ''}`;
-  logEvent('modelos', `Indicadores de conflictividad por ${unit} en «${ds.label}» (${R.total} conflictos, ${R.cycles.length} ciclos, ${peaks.length} picos). ${note}`);
-  document.getElementById('conf-report').onclick = ()=>{ const img = charts['c-conf'].toBase64Image(); addToReport({type:'chart', title, imageDataURL: img, citation: note + ' ' + modelNote(ds, '') + ' Calculado con "'+APP_LABEL+'" el '+new Date().toLocaleString('es-AR')+'.'}); };
-  document.getElementById('conf-xlsx').onclick = ()=>downloadXLSX(xlsxName('conflictividad_'+unit), [
-    {name:'Por período', aoa: [['Período','Conflictos','Pico','En ciclo'].concat(actorCol ? ['Actores distintos'] : [], formCol ? ['Forma principal','Diversidad (Pielou)'] : [])].concat(R.series.map(s=>[lab(s.k), s.n, s.peak ? 'sí' : '', s.inCycle ? 'sí' : ''].concat(actorCol ? [s.actors] : [], formCol ? [s.topForm, s.pielou==null ? '' : round2(s.pielou)] : [])))},
-    {name:'Ciclos', aoa: [['Desde','Hasta','Duración','Conflictos','Momento más alto','Conflictos en el momento más alto']].concat(R.cycles.map(c=>[lab(c.fromK), lab(c.toK), c.len, c.total, lab(c.peakK), c.peakN]))}], [title, note]);
+  const title = `Indicadores por ${per1}: ${ds.label}`;
+  const note = `Medida: ${what}. Picos: más de ${fmtN(R.K,1)} desvíos sobre el promedio${basis}. ${V.cycles}: ${R.minLen} o más ${perN} seguidos por encima de ${refTxt}${basis}.${formCol ? ' Diversidad: equidad de Pielou sobre "'+formCol+'".' : ''}`;
+  logEvent('modelos', `Indicadores por ${per1} en «${ds.label}» (${R.total} ${unit}; ${R.cycles.length} ${V.cycles.toLowerCase()}, ${peaks.length} picos). ${note}`);
+  document.getElementById('conf-report').onclick = ()=>{ addToReport({type:'chart', title, imageDataURL: charts['c-conf'].toBase64Image(), citation: note + ' ' + modelNote(ds, '') + ' Calculado con "'+APP_LABEL+'" el '+new Date().toLocaleString('es-AR')+'.'}); };
+  document.getElementById('conf-xlsx').onclick = ()=>downloadXLSX(xlsxName('indicadores_'+per1), [
+    {name:'Por período', aoa: [['Período', what].concat(R.seasonal ? ['Ajustado'] : [], ['Pico','En ciclo'], actorCol ? ['Actores distintos'] : [], formCol ? ['Categoría principal','Diversidad (Pielou)'] : [])].concat(R.series.map(s=>[lab(s.k), s.n==null ? '' : round2(s.n)].concat(R.seasonal ? [s.adj==null ? '' : round2(s.adj)] : [], [s.peak ? 'sí' : '', s.inCycle ? 'sí' : ''], actorCol ? [s.actors] : [], formCol ? [s.topForm, s.pielou==null ? '' : round2(s.pielou)] : [])))},
+    {name: V.cycles, aoa: [['Desde','Hasta','Duración', R.agg==='mean' ? 'Promedio del tramo' : 'Total','Momento más alto','Valor en el momento más alto']].concat(R.cycles.map(c=>[lab(c.fromK), lab(c.toK), c.len, round2(c.total), lab(c.peakK), round2(c.peakN)]))}]
+    .concat(R.profile ? [{name:'Estacionalidad', aoa: [[gran==='mes' ? 'Mes' : 'Trimestre', 'Promedio', 'Índice', 'Años con dato']].concat(R.profile.map((p,i)=>[gran==='mes' ? MESES[i] : 'T'+(i+1), p.mean==null ? '' : round2(p.mean), p.index==null ? '' : round2(p.index), p.years]))}] : []), [title, note]);
 }
-/* ===== CONFLICTIVIDAD (fin) ===== */
+/* ===== INDICADORES (fin) ===== */
+
 
 /* ===== OCR: texto desde imágenes, fotos y PDF escaneados (inicio) ===== */
 // Motor: Tesseract (incluido en vendor/tesseract, se descarga solo la primera vez que se usa).
@@ -6022,7 +6096,7 @@ function applyProfile(p, sources, keepCodebook){
 
 /* ===== MÓDULOS DEL PROYECTO (inicio) ===== */
 // Cada proyecto elige qué partes usa; las que no, se ocultan para simplificar la pantalla
-const MODULES = [['relatos','Relatos (crónicas fechadas)','tab-texto'], ['entrevistas','Entrevistas','tab-entrevistas'], ['codigos','Códigos, análisis de palabras y mapas mentales','tab-codigos'], ['biblio','Bibliografía','tab-biblio'], ['conflicto','Conflictividad y red de actores (en Gráficos)',null], ['encuesta','Comparar grupos y regresión (en Gráficos)',null]];
+const MODULES = [['relatos','Relatos (crónicas fechadas)','tab-texto'], ['entrevistas','Entrevistas','tab-entrevistas'], ['codigos','Códigos, análisis de palabras y mapas mentales','tab-codigos'], ['biblio','Bibliografía','tab-biblio'], ['conflicto','Indicadores y red de actores (en Gráficos)',null], ['encuesta','Comparar grupos y regresión (en Gráficos)',null]];
 function moduleOn(k){ return !(project.modules && project.modules[k]===false); }
 function applyModules(){
   MODULES.forEach(([k,,tab])=>{ if(tab){ const b = document.getElementById(tab); if(b) b.hidden = !moduleOn(k); } });
@@ -8265,7 +8339,7 @@ function setupHelp(){
   });
 }
 const GLOSSARY = [
-  ['ciclos','Picos y ciclos de protesta','Un pico es un período (mes, trimestre o año) con una cantidad de conflictos que supera el promedio en más de 1,5 desvíos estándar. Un ciclo de protesta es un tramo de dos o más períodos seguidos por encima de la mediana. Son criterios descriptivos y fijos, para comparar entre bases y períodos; no reemplazan el análisis histórico de cada momento. La diversidad del repertorio (equidad de Pielou) va de 0 (una sola forma de protesta) a 1 (todas las formas con el mismo peso).'],
+  ['ciclos','Indicadores: picos, ciclos y estacionalidad','Un pico es un período (mes, trimestre o año) cuyo valor supera el promedio en más de un número fijo de desvíos estándar (1,5 por defecto). Un ciclo es un tramo de períodos seguidos por encima de la mediana (o del promedio): dos o más por defecto; en el estudio del conflicto social se lo llama ciclo de protesta. El índice estacional compara el promedio de cada mes (o trimestre) del año con el promedio general: mayor que 1, una época de más actividad. Ajustar por estacionalidad resta ese efecto, para que un pico no sea solo la época del año. La diversidad (equidad de Pielou) va de 0 (una sola categoría) a 1 (todas con el mismo peso). Son criterios descriptivos y explícitos, que no reemplazan el análisis de cada momento.'],
   ['red','Red de actores y centralidad','Representa qué actores aparecen juntos en los mismos hechos o relatos. El grado es la cantidad de actores distintos con los que se vincula cada uno; el grado ponderado suma cuántas veces aparecen juntos; la intermediación mide cuánto un actor está en el camino entre otros que no se vinculan directamente: los actores con intermediación alta funcionan como puentes. La red muestra co-apariciones, no necesariamente alianzas.'],
   ['keyness','Palabras características (log-verosimilitud)','Las palabras que un grupo de textos usa proporcionalmente más que el resto (por ejemplo, las que distinguen a un tópico o a una entrevista). Se miden con la log-verosimilitud (G²), que compara la frecuencia en el grupo con la del resto: con G² mayor que 3,84 la diferencia es significativa (p < 0,05). Muestran de qué se habla en cada grupo, pero no reemplazan la lectura de los textos.'],
   ['rangos','Pruebas de rangos (no paramétricas)','Comparan grupos según la posición (el rango) de cada valor, en lugar del promedio: Mann-Whitney para dos grupos y Kruskal-Wallis para tres o más. No suponen que los datos sigan una distribución normal, por eso convienen con pocos casos, con valores extremos o con escalas ordinales. Informan medianas y rangos medios.'],
