@@ -46,6 +46,12 @@
 .ocr-text{border:1px solid var(--line);border-radius:4px;padding:8px 12px;min-height:220px;max-height:46vh;overflow:auto;background:var(--panel);font-size:.9rem;line-height:1.6}
 .ocr-text p{margin:0 0 8px}
 .mode-in-menu{display:none}
+td.cell-flag{background:rgba(181,83,60,.13);box-shadow:inset 0 0 0 1px rgba(181,83,60,.55);cursor:help}
+td.cell-flag.mark-vacia{background:rgba(194,142,43,.12);box-shadow:inset 0 0 0 1px rgba(194,142,43,.55)}
+.cell-flag-empty{color:var(--sub);font-style:italic;font-size:.8em}
+tr.row-flag td:first-child{box-shadow:inset 4px 0 0 #B5533C}
+.mark-chip{display:inline-block;padding:1px 8px;border-radius:999px;background:rgba(181,83,60,.12);color:var(--ink);font-size:.78rem;margin:2px 2px 0 0}
+.mark-chip.mark-vacia{background:rgba(194,142,43,.15)}
 .mode-more{border:1px solid var(--line);border-radius:999px;padding:7px 14px;font:inherit;font-size:.85rem;background:var(--panel);color:var(--ink);cursor:pointer}
 .mode-more.active{background:var(--teal-d);color:#fff;border-color:var(--teal-d)}
 .map-label{background:rgba(255,255,255,.9);border:1px solid #C7D0CD;font-size:11px;padding:1px 5px;box-shadow:none}
@@ -381,6 +387,12 @@ tbody tr:hover{background:var(--accent-bg)}
       <label id="qual-only-wrap" style="display:none;align-items:center;gap:6px;font-size:.82rem;color:var(--sub);cursor:pointer;margin:-4px 0 10px">
         <input type="checkbox" id="chk-qual-only"> Mostrar solo filas con relato narrativo (📄) disponible
       </label>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:-2px 0 8px">
+        <label class="chk-opt"><input type="checkbox" id="chk-marks"> Marcar celdas con posibles errores</label>
+        <label class="chk-opt" id="marks-only-wrap" style="display:none"><input type="checkbox" id="chk-marks-only"> Mostrar solo registros con marcas</label>
+        <button type="button" class="mini-export" id="marks-xlsx" style="display:none">⭳ Lista de marcas (Excel)</button>
+      </div>
+      <p id="marks-summary" class="hint" style="display:none;margin:0 0 10px"></p>
       <div style="display:flex;gap:8px;margin-bottom:10px">
         <button class="go" id="exp-csv">Exportar CSV</button>
         <button class="go" id="exp-xlsx">Exportar Excel</button>
@@ -600,7 +612,7 @@ tbody tr:hover{background:var(--accent-bg)}
       <div class="adv-controls"><div class="field"><label>Base</label><select id="map-ds"></select></div></div>
       <p class="hint" style="margin:0 0 8px">Se aplican los filtros que tenga la base en la solapa Gráficos. Los lugares se ubican con las coordenadas de ⚙ Configurar proyecto o con columnas de latitud y longitud de la base.</p>
       <div id="map-view">
-      <p class="hint helptext">Mapa esquemático (no es un mapa real con coordenadas satelitales) — ubica los valores de la columna de tipo "Lugar" según las coordenadas cargadas en la configuración del proyecto, con el tamaño del punto proporcional a los registros filtrados.</p>
+      <p class="hint helptext">Mapa interactivo sobre una cartografía incluida (funciona sin conexión): se acerca, se aleja y se desplaza. Los lugares se ubican con las coordenadas cargadas en ⚙ Configurar proyecto (columna de tipo Lugar) o con columnas de latitud y longitud de la base. El fondo de OpenStreetMap es opcional y requiere internet.</p>
       <div id="map-svg-wrap" style="background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:10px"></div>
     </div>
     </section>
@@ -640,7 +652,7 @@ tbody tr:hover{background:var(--accent-bg)}
 
 <script>
 // ===== Versión de Telar (al publicar una nueva, cambiar acá y en sw.js) =====
-const APP_VERSION = '0.13.2';
+const APP_VERSION = '0.13.3';
 const APP_CHANNEL = 'beta';
 const APP_LABEL = 'Telar ' + APP_VERSION + ' ' + APP_CHANNEL;
 // Dirección del formulario de comentarios (ej. un Formulario de Google). Vacía: se explica cómo configurarla.
@@ -889,6 +901,8 @@ document.getElementById('chk-percent').addEventListener('change', e=>{
 let showTrend = false;
 document.getElementById('cross-xlsx-btn').addEventListener('click', exportCrossXLSX);
 document.getElementById('cmp-run').addEventListener('click', runCompare);
+['chk-marks','chk-marks-only'].forEach(id=>document.getElementById(id).addEventListener('change', renderTable));
+document.getElementById('marks-xlsx').addEventListener('click', exportMarks);
 // "Más análisis": los modos de la lista se abren con sus botones (ocultos), y la lista muestra cuál está activo
 const MENU_MODES = ['timeline','cmp','reg','conf'];
 document.getElementById('map-ds').addEventListener('change', e=>{ if(datasets[e.target.value]){ active = e.target.value; buildUI(); renderMap(); } });
@@ -8236,6 +8250,87 @@ function renderQuality(){
   document.getElementById('quality-table-wrap').innerHTML = html;
 }
 
+/* ===== MARCAS DE POSIBLES ERRORES EN LAS CELDAS (inicio) ===== */
+// Señala celdas para revisar; no corrige nada: la decisión queda en manos de quien investiga
+const MARK_KINDS = {ilegible:'Valor ilegible', tipeo:'Posible error de tipeo', atipico:'Número atípico', fecha:'Fecha dudosa', vacia:'Vacía inusual', duplicado:'Registro duplicado'};
+function editDistance(a, b, max){
+  if(Math.abs(a.length-b.length) > max) return max+1;
+  let prev = Array.from({length:b.length+1}, (_,j)=>j);
+  for(let i=1;i<=a.length;i++){ const cur = [i]; let best = i;
+    for(let j=1;j<=b.length;j++){ cur[j] = Math.min(prev[j]+1, cur[j-1]+1, prev[j-1] + (a[i-1]===b[j-1] ? 0 : 1)); if(cur[j]<best) best = cur[j]; }
+    if(best>max) return max+1; prev = cur; }
+  return prev[b.length];
+}
+function markKey(v){ return String(v).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9ñ]+/g,''); }
+function quartiles(vals){ const s = vals.slice().sort((a,b)=>a-b), q = p=>{ const pos = (s.length-1)*p, lo = Math.floor(pos), hi = Math.ceil(pos); return s[lo] + (s[hi]-s[lo])*(pos-lo); }; return [q(0.25), q(0.5), q(0.75)]; }
+function cellIssues(ds){
+  const key = ds.rows.length + '|' + JSON.stringify(ds.schema && ds.schema.cols) + '|' + (ds.dateCol||'');
+  if(ds.__issues && ds.__issuesKey===key) return ds.__issues;
+  const out = new Map(), cols = [ds.dateCol, ...ds.columns].filter(Boolean), N = ds.rows.length;
+  const add = (r, c, kind, msg, sug)=>{ if(!out.has(r)) out.set(r, []); const l = out.get(r); if(!l.some(x=>x.col===c && x.kind===kind)) l.push({col:c, kind, msg, sug: sug||''}); };
+  const roleOf = c=>c===ds.dateCol ? 'fecha' : colRole(ds, c);
+  // 1) valores que no se pudieron leer para el tipo de la columna (quedaron vacíos)
+  Object.entries(ds.originals||{}).forEach(([c, orig])=>{ if(!cols.includes(c) || !Array.isArray(orig)) return;
+    ds.rows.forEach((r,i)=>{ const o = orig[i]; if(o!=null && String(o).trim()!=='' && !(o instanceof Date) && (r[c]==null || r[c]==='')) add(r, c, 'ilegible', `No se pudo leer como ${roleOf(c)==='fecha' ? 'fecha' : 'número'}: «${String(o).slice(0,40)}». Quedó vacía.`); }); });
+  cols.forEach(c=>{
+    const role = roleOf(c);
+    if(['id','texto','fragmento'].includes(role)) return;
+    // 2) vacías en columnas que casi siempre tienen dato
+    const miss = ds.rows.filter(r=>r[c]==null || r[c]==='' || (Array.isArray(r[c]) && !r[c].length));
+    if(N>=20 && miss.length && miss.length <= 0.05*N) miss.forEach(r=>{ if(!(out.get(r)||[]).some(x=>x.col===c)) add(r, c, 'vacia', 'Celda vacía en una columna que casi siempre tiene dato.'); });
+    // 3) números atípicos extremos (más de 3 rangos intercuartiles fuera de la caja)
+    if(role==='numero' || role==='peso'){
+      const vals = ds.rows.map(r=>r[c]).filter(v=>typeof v==='number' && isFinite(v));
+      if(vals.length>=10){ const [q1,,q3] = quartiles(vals), iqr = q3-q1;
+        if(iqr>0) ds.rows.forEach(r=>{ const v = r[c]; if(typeof v==='number' && (v < q1-3*iqr || v > q3+3*iqr)) add(r, c, 'atipico', `Valor muy alejado del resto (la mitad central de "${c}" está entre ${numFmt(q1)} y ${numFmt(q3)}). Revisar si es un error de carga.`); }); }
+    }
+    // 4) fechas futuras, anteriores a 1900 o muy alejadas del resto
+    if(role==='fecha'){
+      const now = new Date(), ds_ = ds.rows.filter(r=>r[c] instanceof Date), ys = ds_.map(r=>r[c].getFullYear());
+      const [q1,,q3] = ys.length>=10 ? quartiles(ys) : [null,null,null], iqr = q1!=null ? q3-q1 : 0;
+      ds_.forEach(r=>{ const d = r[c], y = d.getFullYear();
+        if(d > now) add(r, c, 'fecha', 'Fecha futura.');
+        else if(y < 1900) add(r, c, 'fecha', 'Fecha anterior a 1900.');
+        else if(q1!=null && (y < q1 - 3*Math.max(iqr,1) || y > q3 + 3*Math.max(iqr,1))) add(r, c, 'fecha', `Año muy alejado del resto (la mayoría entre ${q1} y ${q3}).`); });
+    }
+    // 5) categorías: variantes de escritura y posibles errores de tipeo
+    if(['categoria','lugar','escala','codigo','documento'].includes(role)){
+      const cnt = new Map(), rowsOf = new Map();
+      ds.rows.forEach(r=>{ const v = r[c]; (Array.isArray(v) ? v : [v]).forEach(x=>{ if(x==null || x==='') return; const s = String(x).trim(); if(!s) return; cnt.set(s, (cnt.get(s)||0)+1); if(!rowsOf.has(s)) rowsOf.set(s, []); rowsOf.get(s).push(r); }); });
+      if(cnt.size<2) return;
+      const byKey = new Map(); cnt.forEach((n, v)=>{ const k = markKey(v); if(!byKey.has(k)) byKey.set(k, []); byKey.get(k).push([v, n]); });
+      byKey.forEach(list=>{ if(list.length<2) return; list.sort((a,b)=>b[1]-a[1]); const main = list[0][0];
+        list.slice(1).forEach(([v])=>rowsOf.get(v).forEach(r=>add(r, c, 'tipeo', `«${v}» está escrito distinto de «${main}» (mayúsculas, tildes, espacios o signos).`, main))); });
+      const freq = [...byKey.values()].map(l=>l.sort((a,b)=>b[1]-a[1])[0]).filter(([,n])=>n>=5);
+      cnt.forEach((n, v)=>{ if(n>2) return; const k = markKey(v); if(k.length<4) return;
+        const best = freq.find(([f, fn])=>{ const fk = markKey(f); return fk!==k && fn >= 3*n && editDistance(k, fk, k.length>=8 ? 2 : 1) <= (k.length>=8 ? 2 : 1); });
+        if(best) rowsOf.get(v).forEach(r=>add(r, c, 'tipeo', `«${v}» aparece ${n===1 ? 'una sola vez' : 'solo '+n+' veces'} y se parece mucho a «${best[0]}» (${best[1]} veces): posible error de tipeo.`, best[0])); });
+    }
+  });
+  // 6) registros duplicados exactos (se marca a partir de la segunda aparición)
+  const seen = new Map();
+  ds.rows.forEach(r=>{ const k = cols.map(c=>{ const v = r[c]; return v instanceof Date ? v.getTime() : Array.isArray(v) ? v.join('|') : v; }).join('␟');
+    if(seen.has(k)) add(r, null, 'duplicado', 'Registro idéntico a otro en todas las columnas: posible carga duplicada.'); else seen.set(k, r); });
+  ds.__issues = out; ds.__issuesKey = key; return out;
+}
+function marksSummaryHtml(issues, rows){
+  const by = {}; let cells = 0, nrows = 0;
+  rows.forEach(r=>{ const l = issues.get(r); if(!l) return; nrows++; l.forEach(x=>{ by[x.kind] = (by[x.kind]||0)+1; cells++; }); });
+  if(!cells) return '✓ No se encontraron posibles errores en los registros filtrados.';
+  return `<strong>${cells}</strong> marca(s) en <strong>${nrows}</strong> registro(s): ${Object.entries(by).map(([k,n])=>`<span class="mark-chip mark-${k}">${MARK_KINDS[k]}: ${n}</span>`).join(' ')} <span class="hint">Pasá el mouse por una celda marcada para ver el motivo. Telar no corrige nada: revisá y corregí en el archivo original si corresponde.</span>`;
+}
+function exportMarks(){
+  const ds = datasets[active]; if(!ds) return;
+  const issues = cellIssues(ds), rows = getFiltered(), idx = new Map(ds.rows.map((r,i)=>[r,i]));
+  const aoa = [['Fila en la base', 'Columna', 'Valor', 'Problema', 'Detalle', 'Sugerencia']];
+  rows.forEach(r=>(issues.get(r)||[]).forEach(x=>{ let v = x.col ? r[x.col] : ''; if(v instanceof Date) v = v.toLocaleDateString('es-AR'); if(Array.isArray(v)) v = v.join(', ');
+    if(x.kind==='ilegible' && ds.originals && ds.originals[x.col]) v = ds.originals[x.col][idx.get(r)];
+    aoa.push([idx.get(r)+2, x.col || '(todo el registro)', v==null ? '' : String(v), MARK_KINDS[x.kind], x.msg, x.sug]); }));
+  logEvent('base', `Revisión de posibles errores en «${ds.label}»: ${aoa.length-1} marca(s) exportadas para revisar.`);
+  downloadXLSX(xlsxName('marcas_'+ds.label), [{name:'Marcas', aoa}], [`Posibles errores para revisar en "${ds.label}"`, 'La columna "Fila en la base" corresponde a la fila del archivo original (contando el encabezado como fila 1).']);
+}
+/* ===== MARCAS DE POSIBLES ERRORES (fin) ===== */
+
 function buildCitation(ds, r, cols){
   const parts = [ds.label];
   if(ds.dateCol && r[ds.dateCol] instanceof Date) parts.push(r[ds.dateCol].toLocaleDateString('es-AR'));
@@ -8255,16 +8350,21 @@ function renderTable(){
   if(hasQual && document.getElementById('chk-qual-only').checked){
     rows = rows.filter(r=>findQualDocForYear(r.__Año));
   }
+  const marksOn = document.getElementById('chk-marks').checked, issues = marksOn ? cellIssues(ds) : null;
+  ['marks-only-wrap','marks-xlsx','marks-summary'].forEach(id=>{ document.getElementById(id).style.display = marksOn ? (id==='marks-summary' ? 'block' : 'flex') : 'none'; });
+  if(marksOn){ document.getElementById('marks-summary').innerHTML = marksSummaryHtml(issues, rows); if(document.getElementById('chk-marks-only').checked) rows = rows.filter(r=>issues.has(r)); }
   const noYearT = document.getElementById('f-yfrom') ? countMissingYear(ds) : 0;
   document.getElementById('rowcount').textContent = `${rows.length} de ${ds.rows.length} registros${weightsOn(ds) ? ` (N ponderado = ${round2(sumWeights(ds, rows)).toLocaleString('es-AR')})` : ''}${noYearT?` — ${noYearT} sin año identificable quedan fuera del rango de años`:''} (mostrando hasta 300 en la tabla)`;
   rows = rows.slice(0, 300);
   const cols = [ds.dateCol, ...ds.columns].filter(Boolean);
   document.querySelector('#datatable thead').innerHTML = '<tr>'+cols.map(c=>`<th>${esc(c)}</th>`).join('')+'<th>Detalle</th>'+(hasQual?'<th>Contexto</th>':'')+'</tr>';
   document.querySelector('#datatable tbody').innerHTML = rows.map((r,ri)=>
-    '<tr>'+cols.map(c=>{
+    (()=>{ const l = issues && issues.get(r), dup = l && l.find(x=>x.kind==='duplicado'); return dup ? `<tr class="row-flag" title="${esc(dup.msg)}">` : '<tr>'; })()+cols.map(c=>{
       let v = r[c];
       if(v instanceof Date) v = v.toLocaleDateString('es-AR');
       v = displayValue(ds, c, r[c]);
+      const f = issues && (issues.get(r)||[]).filter(x=>x.col===c);
+      if(f && f.length) return `<td class="cell-flag mark-${f[0].kind}" title="${esc(f.map(x=>MARK_KINDS[x.kind]+': '+x.msg).join('\n'))}">${v==null || v==='' ? '<span class="cell-flag-empty">(vacía)</span>' : esc(v)}</td>`;
       return `<td>${v==null?'':esc(v)}</td>`;
     }).join('') + `<td><button class="mini-export" data-detail-ri="${ri}">Ver</button></td>` + (hasQual ? `<td>${findQualDocForYear(r.__Año)?`<button class="context-badge" data-ri="${ri}" title="Hay relato narrativo disponible para esta fecha">📄 Relato</button>`:'<span style="color:var(--line)">—</span>'}</td>` : '') + '</tr>'
   ).join('');
@@ -8278,7 +8378,8 @@ function renderTable(){
         return `<p><strong>${esc(c)}:</strong> ${v==null?'—':esc(v)}</p>`;
       }).join('');
       const citation = buildCitation(ds, r, cols);
-      const body = fieldsHtml + `<div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
+      const flags = document.getElementById('chk-marks').checked ? (cellIssues(ds).get(r)||[]) : [];
+      const body = fieldsHtml + (flags.length ? `<div style="margin-top:12px;padding:10px;border-left:3px solid var(--rust);background:rgba(181,83,60,.06)"><strong>Posibles errores para revisar</strong><ul style="margin:6px 0 0 18px">${flags.map(x=>`<li><strong>${esc(x.col || 'Todo el registro')}</strong>: ${esc(x.msg)}</li>`).join('')}</ul></div>` : '') + `<div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
         <button class="go" id="copy-cite-btn">Copiar cita metodológica</button>
         <p class="hint" style="margin-top:8px">${esc(citation)}</p>
       </div>`;
