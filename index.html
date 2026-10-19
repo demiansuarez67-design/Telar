@@ -46,6 +46,13 @@
 .ocr-text{border:1px solid var(--line);border-radius:4px;padding:8px 12px;min-height:220px;max-height:46vh;overflow:auto;background:var(--panel);font-size:.9rem;line-height:1.6}
 .ocr-text p{margin:0 0 8px}
 .mode-in-menu{display:none}
+details.fold>summary{list-style:none;cursor:pointer;display:flex;align-items:baseline;gap:10px}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary h2{margin:0;display:inline}
+details.fold>summary::before{content:'▸';color:var(--sub);font-size:.9rem}
+details.fold[open]>summary::before{content:'▾'}
+details.fold>summary .fold-hint{font-size:.78rem;color:var(--sub)}
+details.fold[open]>summary{margin-bottom:10px}
 .ex-table td{vertical-align:top}.ex-table .ex-text{font-size:.78rem;color:var(--sub);min-width:240px;max-width:300px;white-space:normal}
 .ex-table .ex-text-inner{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .ex-val{width:100%;min-width:110px;font:inherit;font-size:.8rem;padding:3px 5px;border:1px solid var(--line);border-radius:4px}
@@ -233,8 +240,8 @@ tbody tr:hover{background:var(--accent-bg)}
     <button type="button" class="main-tab" role="tab" id="tab-entrevistas" data-panel="entrevistas" aria-controls="panel-entrevistas" aria-selected="false" tabindex="-1">Entrevistas<span class="tab-count" id="tab-count-entrevistas"></span></button>
     <button type="button" class="main-tab" role="tab" id="tab-codigos" data-panel="codigos" aria-controls="panel-codigos" aria-selected="false" tabindex="-1">Códigos<span class="tab-count" id="tab-count-codigos"></span></button>
     <button type="button" class="main-tab" role="tab" id="tab-biblio" data-panel="biblio" aria-controls="panel-biblio" aria-selected="false" tabindex="-1">Bibliografía<span class="tab-count" id="tab-count-biblio"></span></button>
-    <button type="button" class="main-tab" role="tab" id="tab-espec" data-panel="espec" aria-controls="panel-espec" aria-selected="false" tabindex="-1">Especificidades</button>
     <button type="button" class="main-tab" role="tab" id="tab-mapa" data-panel="mapa" aria-controls="panel-mapa" aria-selected="false" tabindex="-1">Mapa</button>
+    <button type="button" class="main-tab" role="tab" id="tab-espec" data-panel="espec" aria-controls="panel-espec" aria-selected="false" tabindex="-1">Especificidades</button>
   </nav>
 
   <div class="main-panel" id="panel-graficos" role="tabpanel" aria-labelledby="tab-graficos">
@@ -598,19 +605,21 @@ tbody tr:hover{background:var(--accent-bg)}
 
   <div class="main-panel" id="panel-espec" role="tabpanel" aria-labelledby="tab-espec" hidden>
   <section class="card" id="annex-section">
-    <h2 id="annex-title">Anexo metodológico</h2>
+    <details class="fold" id="annex-fold"><summary><h2 id="annex-title">Anexo metodológico</h2><span class="fold-hint">mostrar u ocultar</span></summary>
     <p class="hint">Se arma solo con lo que hay en el proyecto: las fuentes cargadas, cómo se leyó cada variable, los criterios de cálculo usados y el registro de decisiones. Se actualiza cada vez que abrís esta solapa.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
       <button type="button" class="go" id="annex-dl">⭳ Descargar (HTML)</button>
       <button type="button" class="mini-export" id="annex-report" style="padding:8px 12px">📌 Agregar al informe</button>
     </div>
     <div id="annex-view" class="annex tablewrap" style="padding:4px 16px;font-size:.9rem;max-height:560px"></div>
+    </details>
   </section>
   <section class="card" id="glossary-section">
-    <h2>Glosario</h2>
+    <details class="fold" id="gl-fold"><summary><h2>Glosario</h2><span class="fold-hint">mostrar u ocultar</span></summary>
     <p class="hint">Términos que usa la app, explicados en lenguaje llano.</p>
     <input type="text" id="gl-search" placeholder="Buscar un término" style="margin-bottom:8px;width:100%;max-width:360px">
     <div id="gl-list"></div>
+    </details>
   </section>
   </div>
   <div class="main-panel" id="panel-mapa" role="tabpanel" aria-labelledby="tab-mapa" hidden>
@@ -659,7 +668,7 @@ tbody tr:hover{background:var(--accent-bg)}
 
 <script>
 // ===== Versión de Telar (al publicar una nueva, cambiar acá y en sw.js) =====
-const APP_VERSION = '0.14.0';
+const APP_VERSION = '0.14.1';
 const APP_CHANNEL = 'beta';
 const APP_LABEL = 'Telar ' + APP_VERSION + ' ' + APP_CHANNEL;
 // Dirección del formulario de comentarios (ej. un Formulario de Google). Vacía: se explica cómo configurarla.
@@ -3643,7 +3652,12 @@ function parseInterview(paras, forcedInterviewers){
   for(; start<paras.length; start++){
     const m = paras[start].match(/^([A-Za-zÁÉÍÓÚÑáéíóúñ ]{3,25})\s*:\s*(.+)$/);
     const key = m && normColName(m[1]).replace(/\s+/g,'').replace('/a','');
-    if(m && META_KEYS[key]){
+    // un dato de encabezado tiene que parecer un dato (un nombre, una fecha, un lugar breve), no una intervención
+    const plausibleMeta = (name, val)=>{ const words = val.split(/\s+/).length;
+      if(name==='Fecha') return !!parseDateLoose(val) || (val.length<=30 && words<=5);
+      if(name==='Entrevistado/a' || name==='Entrevistador/a') return val.length<=60 && words<=7 && !/[?¿!¡]/.test(val) && !/[.;:]\s+\S/.test(val);
+      return val.length<=80 && words<=12 && !/[?¿]/.test(val); };
+    if(m && META_KEYS[key] && plausibleMeta(META_KEYS[key], m[2].trim())){
       const name = META_KEYS[key], val = m[2].trim();
       if(name==='Fecha'){ const d = parseDateLoose(val); meta.fecha = d ? isoDate(d) : val; }
       else if(name==='Lugar') meta.lugar = val;
@@ -3659,7 +3673,8 @@ function parseInterview(paras, forcedInterviewers){
   // etiquetas candidatas: se repiten, o son etiquetas típicas de entrevistador/a
   const counts = {};
   paras.slice(start).forEach(p=>{ const s = matchSpeaker(p); if(s) counts[s.label] = (counts[s.label]||0)+1; });
-  const isSpeaker = l => counts[l]>=2 || isInterviewerLabel(l) || isRespondentKey(l) || (meta.nombre && (normColName(l)===normColName(meta.nombre) || l===initialsOf(meta.nombre)));
+  // una etiqueta que aparece una sola vez también cuenta si sus iniciales son las de una etiqueta frecuente ("Jerónimo García" → "JG")
+  const isSpeaker = l => counts[l]>=2 || isInterviewerLabel(l) || isRespondentKey(l) || (meta.nombre && (normColName(l)===normColName(meta.nombre) || l===initialsOf(meta.nombre))) || (/\s/.test(l) && counts[initialsOf(l)]>=2);
   const labels = Object.keys(counts).filter(isSpeaker);
   let interviewer = forcedInterviewers ? forcedInterviewers.filter(l=>labels.includes(l)) : labels.filter(isInterviewerLabel);
   // si ninguna etiqueta es típica, el entrevistador es quien más termina sus turnos con "?"
@@ -3689,9 +3704,20 @@ function parseInterview(paras, forcedInterviewers){
     turns.push({label, text:t.text, ts:null, implicit:true});
     prev = label;
   });
+  // etiquetas que son la misma persona escrita de dos maneras: se unifican (la más usada queda; el nombre completo se muestra)
+  const cnt = {}; turns.forEach(t=>{ cnt[t.label] = (cnt[t.label]||0)+1; });
+  const alias = {}, fullName = {};
+  const group = (ls)=>{ if(ls.length<2) return; const keep = ls.slice().sort((a,b)=>cnt[b]-cnt[a])[0]; const longest = ls.slice().sort((a,b)=>b.length-a.length)[0];
+    ls.forEach(l=>{ if(l!==keep) alias[l] = keep; }); if(longest.length>keep.length) fullName[keep] = longest; };
+  const lbs = Object.keys(cnt).filter(l=>l!=='__R__');
+  group(lbs.filter(l=>interviewer.includes(l)));
+  lbs.filter(l=>!interviewer.includes(l) && !alias[l]).forEach(l=>{ if(alias[l]) return;
+    const same = lbs.filter(x=>x!==l && !interviewer.includes(x) && !alias[x] && (initialsOf(x)===l || initialsOf(l)===x || normColName(x)===normColName(l) || (meta.nombre && [x,l].every(y=>normColName(y)===normColName(meta.nombre) || y===initialsOf(meta.nombre)))));
+    if(same.length) group([l].concat(same)); });
+  turns.forEach(t=>{ if(alias[t.label]) t.label = alias[t.label]; });
   const speakers = {};
-  turns.forEach(t=>{ const sp = speakers[t.label] || (speakers[t.label] = {role: interviewer.includes(t.label) ? 'entrevistador' : 'entrevistado', name: t.label==='__R__' ? 'Entrevistado/a' : t.label, count:0}); sp.count++; });
-  return {meta, speakers, turns, implicitCount, notesTop, labeledCount: turnsRaw.filter(t=>t.label).length};
+  turns.forEach(t=>{ const sp = speakers[t.label] || (speakers[t.label] = {role: interviewer.includes(t.label) ? 'entrevistador' : 'entrevistado', name: t.label==='__R__' ? 'Entrevistado/a' : (fullName[t.label] || t.label), count:0}); sp.count++; });
+  return {meta, speakers, turns, implicitCount, notesTop, labeledCount: turnsRaw.filter(t=>t.label).length, alias};
 }
 // ¿El Word es una entrevista? Muchos párrafos que empiezan con "Hablante:" y pocos con fecha
 function looksLikeInterview(paras){
@@ -3794,6 +3820,13 @@ function setInterviewStatus(key, statusEl){
 }
 
 // Revisión al cargar (y edición posterior): hablantes, roles y datos de la entrevista
+function mergeInterviewSpeakers(iv, from, keep){
+  iv.labelAlias = iv.labelAlias || {};
+  from.forEach(l=>{ if(l===keep || !iv.speakers[l]) return;
+    iv.turns.forEach(t=>{ if(t.label===l) t.label = keep; });
+    iv.speakers[keep].count += iv.speakers[l].count; delete iv.speakers[l];
+    iv.labelAlias[l] = keep; Object.keys(iv.labelAlias).forEach(k=>{ if(iv.labelAlias[k]===l) iv.labelAlias[k] = keep; }); });
+}
 function openInterviewCheck(key, opts={}){
   const iv = interviews[key];
   if(!iv) return nextWizard();
@@ -3802,8 +3835,8 @@ function openInterviewCheck(key, opts={}){
   const extraTxt = Object.entries(iv.meta.extra||{}).map(([k,v])=>k+': '+v).join('\n');
   const body = `
     <p class="hint">${opts.edit ? 'Datos de' : 'Se reconoció como entrevista'} "${esc(iv.label)}": ${iv.turns.length} intervenciones.${iv.implicitCount ? ` ${iv.implicitCount} párrafos sin etiqueta de hablante se atribuyeron por alternancia: después de una pregunta, a quien responde; si no, a quien venía hablando.` : ''}</p>
-    <div class="tablewrap"><table><thead><tr><th>Etiqueta en el texto</th><th>Intervenciones</th><th>Rol</th><th>Nombre a mostrar</th></tr></thead><tbody>
-      ${sp.map(([l,s],i)=>`<tr><td><strong>${l==='__R__' ? '(sin etiqueta)' : esc(l)}</strong></td><td>${s.count}</td>
+    <div class="tablewrap"><table><thead><tr><th title="Marcá las etiquetas que son la misma persona">Unir</th><th>Etiqueta en el texto</th><th>Intervenciones</th><th>Rol</th><th>Nombre a mostrar</th></tr></thead><tbody>
+      ${sp.map(([l,s],i)=>`<tr data-l="${esc(l)}"><td><input type="checkbox" class="iv-merge" data-l="${esc(l)}"></td><td><strong>${l==='__R__' ? '(sin etiqueta)' : esc(l)}</strong>${Object.entries(iv.labelAlias||{}).filter(([,t])=>t===l).length ? `<div class="hint" style="margin:0;font-size:.75rem">también: ${Object.entries(iv.labelAlias).filter(([,t])=>t===l).map(([f])=>esc(f)).join(', ')}</div>` : ''}</td><td class="iv-count">${s.count}</td>
         <td><select class="iv-role" data-l="${esc(l)}">${['entrevistador','entrevistado','otro'].map(r=>`<option value="${r}" ${s.role===r?'selected':''}>${interviewRoleLabel(r)}</option>`).join('')}</select></td>
         <td><input type="text" class="iv-name" data-l="${esc(l)}" value="${esc(s.name||'')}" style="min-width:180px"></td></tr>`).join('')}
     </tbody></table></div>
@@ -3815,10 +3848,22 @@ function openInterviewCheck(key, opts={}){
     <div class="field" style="max-width:100%;margin-bottom:10px"><label>Otros datos de la persona entrevistada, uno por línea (ej. "Edad: 54", "Ocupación: intendente"). Se usan como atributos para cruzar con los códigos.</label><textarea id="iv-m-extra" class="bib-ta" rows="3">${esc(extraTxt)}</textarea></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="go" id="iv-ok">Confirmar</button>
+      ${sp.length>1 ? '<button class="mini-export" id="iv-merge-btn" style="padding:8px 12px" title="Para cuando la misma persona aparece con dos etiquetas (por ejemplo, \'Entrevistador\' y \'E\')">Unir los hablantes marcados</button>' : ''}
       ${!opts.edit && pendingInterviewFiles[key] ? '<button class="mini-export" id="iv-not" style="padding:8px 12px">No es una entrevista: leerlo como relato fechado</button>' : ''}
     </div>`;
   showModal(opts.edit ? 'Datos de la entrevista' : 'Entrevista', body, {wide:true, onClose: ()=>{ nextWizard(); }});
   const box = document.getElementById('modal-body');
+  const mb = document.getElementById('iv-merge-btn');
+  if(mb) mb.onclick = ()=>{
+    const sel = [...box.querySelectorAll('.iv-merge:checked')].map(c=>c.dataset.l).filter(l=>iv.speakers[l]);
+    if(sel.length<2){ alert('Marcá en la columna "Unir" al menos dos etiquetas que sean la misma persona.'); return; }
+    const keep = sel.slice().sort((a,b)=>iv.speakers[b].count-iv.speakers[a].count)[0];
+    const names = sel.map(l=>([...box.querySelectorAll('.iv-name')].find(i=>i.dataset.l===l)||{}).value || iv.speakers[l].name);
+    mergeInterviewSpeakers(iv, sel.filter(l=>l!==keep), keep);
+    iv.speakers[keep].name = names.slice().sort((a,b)=>b.length-a.length)[0] || keep;
+    logEvent('entrevistas', `Entrevista «${iv.label}»: se unieron las etiquetas ${sel.map(l=>'«'+l+'»').join(', ')} como un solo hablante.`);
+    persistSession(); closeModal(false); openInterviewCheck(key, opts);
+  };
   document.getElementById('iv-ok').onclick = ()=>{
     const roles = {}; box.querySelectorAll('.iv-role').forEach(s=>{ roles[s.dataset.l] = s.value; });
     const rolesChanged = Object.entries(roles).some(([l,r])=>iv.speakers[l] && iv.speakers[l].role!==r);
@@ -3829,6 +3874,7 @@ function openInterviewCheck(key, opts={}){
       iv.turns = b.turns; iv.implicitCount = b.implicitCount;
       Object.keys(b.speakers).forEach(l=>{ b.speakers[l].role = roles[l] || b.speakers[l].role; });
       iv.speakers = b.speakers;
+      Object.entries(iv.labelAlias||{}).forEach(([from, to])=>{ if(iv.speakers[from] && iv.speakers[to]) mergeInterviewSpeakers(iv, [from], to); }); // uniones hechas a mano
       iv.turns.forEach((t,i)=>{ if(oldCodes[i]) t.codes = oldCodes[i]; });
     }
     box.querySelectorAll('.iv-name').forEach(inp=>{ const l = inp.dataset.l; if(iv.speakers[l]){ iv.speakers[l].name = inp.value.trim() || l; if(roles[l]) iv.speakers[l].role = roles[l]; } });
@@ -6691,7 +6737,7 @@ function collapseAtStartup(){
 }
 
 /* --- Solapas principales: Gráficos / Texto / Bibliografía --- */
-const MAIN_PANELS = ['graficos','texto','entrevistas','codigos','biblio','espec', 'mapa'];
+const MAIN_PANELS = ['graficos','texto','entrevistas','codigos','biblio','mapa','espec'];
 function showMainPanel(id, opts={}){
   if(id==='codigos') setTimeout(()=>{ renderWordsUI(); renderMindUI(); }, 0);
   if(id==='mapa') setTimeout(()=>{ fillMapDs(); renderMap(); }, 0);
