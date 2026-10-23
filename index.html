@@ -46,6 +46,9 @@
 .ocr-text{border:1px solid var(--line);border-radius:4px;padding:8px 12px;min-height:220px;max-height:46vh;overflow:auto;background:var(--panel);font-size:.9rem;line-height:1.6}
 .ocr-text p{margin:0 0 8px}
 .mode-in-menu{display:none}
+.task-row{display:flex;gap:8px;align-items:center}.task-row .task-text{flex:1;font:inherit;font-size:.9rem;padding:6px 8px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink)}
+.task-row.done .task-text{text-decoration:line-through;color:var(--sub)}.task-row .task-del{border:none;background:none;color:var(--rust);font-size:1.2rem;cursor:pointer;padding:0 6px}
+.bib-chip{display:inline-block;padding:1px 8px;border-radius:999px;background:rgba(47,107,110,.12);font-size:.75rem;margin-right:4px}
 details.fold>summary{list-style:none;cursor:pointer;display:flex;align-items:baseline;gap:10px}
 details.fold>summary::-webkit-details-marker{display:none}
 details.fold>summary h2{margin:0;display:inline}
@@ -590,9 +593,9 @@ tbody tr:hover{background:var(--accent-bg)}
       <span id="bib-caret">▾</span> Bibliografía<span id="bib-count" style="color:var(--sub);font-weight:400;font-size:.9rem"></span>
     </h2>
     <div id="bib-body">
-      <p class="hint helptext" data-help-for="bib-toggle">Subí un PDF (se lee en tu computadora y no se guarda) o cargá la referencia a mano. La app arma la cita en APA 7 y las referencias marcadas se pueden sumar al informe. Lo que se detecta del PDF es un borrador: revisalo siempre antes de guardar.</p>
+      <p class="hint helptext" data-help-for="bib-toggle">Subí un PDF o un Word (se leen en tu computadora y no se guardan), agregá el enlace de una página web o de un video, o cargá la referencia a mano. Las referencias se pueden agrupar en colecciones por tema. La app arma la cita en APA 7 y las referencias marcadas se pueden sumar al informe. Lo que se detecta del PDF es un borrador: revisalo siempre antes de guardar.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <label class="go" style="cursor:pointer;display:inline-block">📄 Subir PDF<input type="file" id="bib-pdf-input" accept=".pdf,application/pdf" style="display:none"></label>
+        <label class="go" style="cursor:pointer;display:inline-block">📄 Subir PDF o Word<input type="file" id="bib-pdf-input" accept=".pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none"></label> <button type="button" class="go" id="bib-link-btn">🔗 Agregar enlace (web o video)</button>
         <button type="button" class="go" id="bib-new-btn">✍ Cargar a mano</button>
         <span id="bib-msg" class="hint" style="margin:0"></span>
       </div>
@@ -634,6 +637,9 @@ tbody tr:hover{background:var(--accent-bg)}
     </section>
   </div>
 
+  <div style="position:fixed;bottom:72px;right:20px;z-index:41">
+    <button id="tasks-fab-btn" style="border-radius:24px;padding:11px 20px;box-shadow:0 4px 14px rgba(0,0,0,.35);background:var(--panel);border:1px solid var(--line);color:var(--ink);font:inherit;font-size:.88rem;cursor:pointer">☑ Tareas</button>
+  </div>
   <div style="position:fixed;bottom:20px;right:20px;z-index:41">
     <button id="notes-fab-btn" style="border-radius:24px;padding:11px 20px;box-shadow:0 4px 14px rgba(0,0,0,.35);background:var(--panel);border:1px solid var(--line);color:var(--ink);font:inherit;font-size:.88rem;cursor:pointer">📝 Notas</button>
   </div>
@@ -668,7 +674,7 @@ tbody tr:hover{background:var(--accent-bg)}
 
 <script>
 // ===== Versión de Telar (al publicar una nueva, cambiar acá y en sw.js) =====
-const APP_VERSION = '0.14.1';
+const APP_VERSION = '0.14.2';
 const APP_CHANNEL = 'beta';
 const APP_LABEL = 'Telar ' + APP_VERSION + ' ' + APP_CHANNEL;
 // Dirección del formulario de comentarios (ej. un Formulario de Google). Vacía: se explica cómo configurarla.
@@ -6885,6 +6891,8 @@ function mountSourceEditor(containerId, onChange){
   refreshPreview();
 }
 
+document.getElementById('tasks-fab-btn').addEventListener('click', openTasks);
+setTimeout(()=>{ try{ updateTasksFab(); }catch(e){} }, 0);
 document.getElementById('notes-fab-btn').addEventListener('click', ()=>{
   const body = `<p class="hint">Notas libres de investigación — se guardan solas en este navegador, no forman parte del informe formal.</p>
     <textarea id="notes-textarea" style="width:100%;min-height:260px;font:inherit;font-size:.9rem;padding:12px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink);resize:vertical;line-height:1.5" placeholder="Ej: revisar si el pico de 2012 coincide con la crisis de Harengus...">${esc(researchNotes)}</textarea>
@@ -9163,7 +9171,10 @@ const BIB_TYPES = {
   capitulo:{label:'Capítulo de libro', fields:['autores','anio','titulo','editores','fuente','edicion','paginas','editorial','enlace'], labels:{fuente:'Título del libro'}},
   tesis:{label:'Tesis', fields:['autores','anio','titulo','detalle','editorial','enlace'], labels:{editorial:'Repositorio (opcional)'}},
   informe:{label:'Informe o documento institucional', fields:['autores','anio','titulo','numero','editorial','enlace'], labels:{autores:'Autores o institución (uno por línea)', numero:'Número o serie (opcional)', editorial:'Organismo editor'}},
-  prensa:{label:'Nota de prensa', fields:['autores','anio','fecha','titulo','fuente','paginas','enlace'], labels:{fuente:'Diario o revista'}}
+  prensa:{label:'Nota de prensa', fields:['autores','anio','fecha','titulo','fuente','paginas','enlace'], labels:{fuente:'Diario o revista'}},
+  web:{label:'Página web', fields:['autores','anio','fecha','titulo','fuente','enlace'], labels:{autores:'Autores o institución (opcional; uno por línea)', fecha:'Día y mes (opcional)', fuente:'Nombre del sitio', enlace:'Enlace (URL)'}},
+  video:{label:'Video (YouTube u otra plataforma)', fields:['autores','anio','fecha','titulo','fuente','enlace'], labels:{autores:'Autor o canal (uno por línea)', fecha:'Día y mes de publicación (opcional)', fuente:'Plataforma (ej. YouTube)', enlace:'Enlace (URL)'}},
+  documento:{label:'Documento de trabajo o archivo (Word u otro)', fields:['autores','anio','titulo','detalle','editorial','enlace'], labels:{detalle:'Descripción (ej. Documento de trabajo, Manuscrito inédito)', editorial:'Institución (opcional)', enlace:'Enlace o nombre del archivo (opcional)'}}
 };
 const BIB_LABELS = {
   autores:'Autores (uno por línea: Apellido, Nombre)', editores:'Editores del libro (uno por línea: Apellido, Nombre)',
@@ -9220,7 +9231,7 @@ function bibFormatAPA(r){
   const A = bibParseAuthors(r.autores);
   const authorStr = bibJoinAuthors(A.map(bibAuthorStr));
   const anio = String(r.anio||'').trim();
-  const datePart = (anio || 's. f.') + ((r.tipo==='prensa' && anio && r.fecha && String(r.fecha).trim()) ? ', '+String(r.fecha).trim() : '');
+  const datePart = (anio || 's. f.') + ((['prensa','web','video'].includes(r.tipo) && anio && r.fecha && String(r.fecha).trim()) ? ', '+String(r.fecha).trim() : '');
   const t = esc(String(r.titulo||'').trim());
   const it = s=>'<i>'+s+'</i>';
   const link = bibLink(r.enlace);
@@ -9251,6 +9262,16 @@ function bibFormatAPA(r){
       break;
     case 'prensa':
       body = [bibEndDot(t), r.fuente ? bibEndDot(it(esc(String(r.fuente).trim())) + (pag ? ', '+bibPagePrefix(pag)+esc(pag) : '')) : '', link];
+      break;
+    case 'web': { // APA 7: Autor. (año, fecha). Título en cursiva. Sitio. URL (el sitio se omite si coincide con el autor)
+      const site = String(r.fuente||'').trim(), siteIsAuthor = site && A.length===1 && A[0].org && bibNorm(A[0].org)===bibNorm(site);
+      body = [bibEndDot(it(t)), (site && !siteIsAuthor) ? bibEndDot(esc(site)) : '', link];
+      break; }
+    case 'video': // APA 7: Autor o canal. (año, fecha). Título en cursiva [Video]. Plataforma. URL
+      body = [bibEndDot(it(t) + ' [Video]'), r.fuente ? bibEndDot(esc(String(r.fuente).trim())) : '', link];
+      break;
+    case 'documento': // APA 7: Autor. (año). Título en cursiva [Descripción]. Institución. URL (si la hay)
+      body = [bibEndDot(it(t) + (r.detalle ? ' ['+esc(String(r.detalle).trim())+']' : '')), edit ? bibEndDot(edit) : '', /^(https?:|10\.|doi:)/i.test(String(r.enlace||'').trim()) ? link : ''];
       break;
     default: // informe o documento institucional
       body = [bibEndDot(it(t) + (r.numero ? ' ('+esc(String(r.numero).trim())+')' : '')), (edit && !sameAsAuthor) ? bibEndDot(edit) : '', link];
@@ -9286,7 +9307,7 @@ function bibRefsListHtml(ids){
 }
 
 // Exportación en formato RIS (lo leen Zotero, Mendeley, EndNote)
-const BIB_RIS_TYPES = {articulo:'JOUR', libro:'BOOK', capitulo:'CHAP', tesis:'THES', informe:'RPRT', prensa:'NEWS'};
+const BIB_RIS_TYPES = {articulo:'JOUR', libro:'BOOK', capitulo:'CHAP', tesis:'THES', informe:'RPRT', prensa:'NEWS', web:'ELEC', video:'VIDEO', documento:'UNPB'};
 function bibToRIS(r){
   const L = ['TY  - '+(BIB_RIS_TYPES[r.tipo]||'GEN')];
   const person = a=>a.org || (a.family + (a.given ? ', '+a.given : ''));
@@ -9308,6 +9329,7 @@ function bibToRIS(r){
   if(enlace && /^https?:/i.test(enlace)) L.push('UR  - '+enlace);
   if(r.detalle) L.push('N1  - '+r.detalle);
   if(r.fecha) L.push('N1  - Fecha: '+r.fecha);
+  (r.colecciones||[]).forEach(c=>L.push('KW  - '+c));
   L.push('ER  - ');
   return L.join('\r\n');
 }
@@ -9686,26 +9708,191 @@ function bibExportRIS(){
   if(!list.length){ alert('Marcá al menos una referencia con la casilla.'); return; }
   saveFile('referencias_'+new Date().toISOString().slice(0,10)+'.ris', list.map(bibToRIS).join('\r\n')+'\r\n');
 }
+/* ===== BIBLIOGRAFÍA: colecciones, exportación, enlaces y archivos Word (inicio) ===== */
+function bibCollections(){ project.bibCollections = project.bibCollections || []; return project.bibCollections; }
+let bibColFilter = '';
+function bibVisible(){ const all = bibSorted(references);
+  if(!bibColFilter) return all;
+  if(bibColFilter==='__none__') return all.filter(r=>!(r.colecciones||[]).length);
+  return all.filter(r=>(r.colecciones||[]).includes(bibColFilter)); }
+function bibColChips(r){ return (r.colecciones||[]).map(c=>`<span class="bib-chip">🗂 ${esc(c)}</span>`).join(' '); }
+function openBibCollectionsFor(r){
+  const cols = bibCollections();
+  showModal('Colecciones de esta referencia', `<p class="hint">${bibFormatAPA(r)}</p>
+    <div id="bc-list" style="display:flex;flex-direction:column;gap:4px;margin:8px 0">${cols.length ? cols.map(c=>`<label class="chk-opt"><input type="checkbox" class="bc-c" value="${esc(c)}" ${(r.colecciones||[]).includes(c) ? 'checked' : ''}> ${esc(c)}</label>`).join('') : '<p class="hint" style="margin:0">Todavía no hay colecciones: creá la primera abajo.</p>'}</div>
+    <div class="adv-controls"><div class="field" style="flex:1"><label>Nueva colección</label><input type="text" id="bc-new" placeholder="ej. Conflictividad pesquera"></div></div>
+    <button class="go" id="bc-ok">Guardar</button>`);
+  document.getElementById('bc-ok').onclick = ()=>{
+    const sel = [...document.querySelectorAll('.bc-c:checked')].map(c=>c.value), nw = document.getElementById('bc-new').value.trim();
+    if(nw){ if(!cols.includes(nw)) cols.push(nw); if(!sel.includes(nw)) sel.push(nw); }
+    r.colecciones = sel; persistSession(); closeModal(false); renderBibliography(); };
+}
+function openBibCollectionsManager(){
+  const cols = bibCollections(), count = c=>references.filter(r=>(r.colecciones||[]).includes(c)).length;
+  showModal('Colecciones de la bibliografía', `<p class="hint">Agrupan las referencias por tema o tópico, como en Zotero. Una referencia puede estar en varias colecciones. Renombrar o borrar una colección no borra referencias.</p>
+    <div class="tablewrap"><table><thead><tr><th>Colección</th><th>Referencias</th><th></th></tr></thead><tbody>${cols.map((c,i)=>`<tr><td><input type="text" class="bm-name" data-i="${i}" value="${esc(c)}" style="width:100%"></td><td>${count(c)}</td><td><button class="mini-export bm-del" data-i="${i}" style="color:var(--rust)">Borrar</button></td></tr>`).join('') || '<tr><td colspan="3" class="hint">Todavía no hay colecciones.</td></tr>'}</tbody></table></div>
+    <div class="adv-controls" style="margin-top:8px"><div class="field" style="flex:1"><label>Nueva colección</label><input type="text" id="bm-new"></div></div>
+    <button class="go" id="bm-ok">Guardar cambios</button>`);
+  const box = document.getElementById('modal-body');
+  box.querySelectorAll('.bm-del').forEach(b=>b.onclick = ()=>{ const c = cols[+b.dataset.i]; if(!confirm(`¿Borrar la colección «${c}»? Las referencias no se borran.`)) return;
+    references.forEach(r=>{ r.colecciones = (r.colecciones||[]).filter(x=>x!==c); }); cols.splice(+b.dataset.i, 1); if(bibColFilter===c) bibColFilter = ''; persistSession(); openBibCollectionsManager(); renderBibliography(); });
+  document.getElementById('bm-ok').onclick = ()=>{
+    box.querySelectorAll('.bm-name').forEach(inp=>{ const old = cols[+inp.dataset.i], nw = inp.value.trim(); if(!nw || nw===old) return;
+      references.forEach(r=>{ r.colecciones = [...new Set((r.colecciones||[]).map(x=>x===old ? nw : x))]; }); cols[+inp.dataset.i] = nw; if(bibColFilter===old) bibColFilter = nw; });
+    const nw = document.getElementById('bm-new').value.trim(); if(nw && !cols.includes(nw)) cols.push(nw);
+    project.bibCollections = [...new Set(cols)]; persistSession(); closeModal(false); renderBibliography(); };
+}
+// --- exportación ---
+function bibToBibTeX(r){
+  const type = {articulo:'article', libro:'book', capitulo:'incollection', tesis:'phdthesis', informe:'techreport', prensa:'article', web:'misc', video:'misc', documento:'unpublished'}[r.tipo] || 'misc';
+  const A = bibParseAuthors(r.autores), first = A[0] ? (A[0].org || A[0].family) : (r.titulo||'ref');
+  const key = bibNorm(first).split(' ')[0] + (r.anio||'sf') + (bibNorm(r.titulo).split(' ').find(w=>w.length>3) || '');
+  const auth = A.map(a=>a.org ? '{'+a.org+'}' : (a.family + (a.given ? ', '+a.given : ''))).join(' and ');
+  const f = [['author', auth], ['title', r.titulo], ['year', r.anio], [r.tipo==='articulo' || r.tipo==='prensa' ? 'journal' : r.tipo==='capitulo' ? 'booktitle' : 'howpublished', r.fuente], ['volume', r.volumen], ['number', r.numero], ['pages', r.paginas ? String(r.paginas).replace(/[–—]/g,'--') : ''], ['edition', r.edicion], ['publisher', r.editorial], ['note', [r.detalle, r.tipo==='video' ? 'Video' : ''].filter(Boolean).join('. ')], [/^10\./.test(String(r.enlace||'')) ? 'doi' : 'url', r.enlace], ['keywords', (r.colecciones||[]).join(', ')]]
+    .filter(([,v])=>v && String(v).trim()).map(([k,v])=>`  ${k} = {${String(v).trim().replace(/[{}]/g,'')}}`);
+  return `@${type}{${key.replace(/[^a-z0-9]/g,'') || 'ref'+r.id},\n${f.join(',\n')}\n}`;
+}
+function openBibExport(){
+  const marked = references.filter(r=>r.inReport).length, cols = bibCollections();
+  if(!references.length){ alert('Todavía no hay referencias.'); return; }
+  showModal('Exportar la bibliografía', `
+    <div class="field" style="max-width:100%;margin-bottom:10px"><label>Qué exportar</label><select id="be-scope">
+      <option value="all">Todas las referencias (${references.length})</option>
+      <option value="marked" ${marked ? '' : 'disabled'}>Las marcadas con la casilla (${marked})</option>
+      ${cols.map(c=>`<option value="col:${esc(c)}" ${bibColFilter===c ? 'selected' : ''}>La colección «${esc(c)}» (${references.filter(r=>(r.colecciones||[]).includes(c)).length})</option>`).join('')}
+      <option value="none">Sin colección (${references.filter(r=>!(r.colecciones||[]).length).length})</option></select></div>
+    <div class="field" style="max-width:100%;margin-bottom:12px"><label>Formato</label><select id="be-fmt">
+      <option value="docx">Word: lista de referencias en APA 7 (.docx)</option>
+      <option value="ris">RIS: para Zotero, Mendeley, EndNote (.ris)</option>
+      <option value="bib">BibTeX: para LaTeX y gestores bibliográficos (.bib)</option>
+      <option value="xlsx">Excel: una fila por referencia, con sus campos (.xlsx)</option></select></div>
+    <p class="hint">Las colecciones viajan como palabras clave en RIS y BibTeX, y como columna en Excel.</p>
+    <button class="go" id="be-ok">Exportar</button>`);
+  document.getElementById('be-ok').onclick = ()=>{
+    const sc = document.getElementById('be-scope').value, fmt = document.getElementById('be-fmt').value;
+    let list = bibSorted(references);
+    if(sc==='marked') list = list.filter(r=>r.inReport); else if(sc==='none') list = list.filter(r=>!(r.colecciones||[]).length); else if(sc.startsWith('col:')){ const c = sc.slice(4); list = list.filter(r=>(r.colecciones||[]).includes(c)); }
+    if(!list.length){ alert('No hay referencias en esa selección.'); return; }
+    const stamp = new Date().toISOString().slice(0,10), base = 'referencias_'+(sc.startsWith('col:') ? bibNorm(sc.slice(4)).replace(/ /g,'_')+'_' : '')+stamp;
+    if(fmt==='ris') saveFile(base+'.ris', list.map(r=>bibToRIS(r) ).join('\r\n')+'\r\n');
+    else if(fmt==='bib') saveFile(base+'.bib', list.map(bibToBibTeX).join('\n\n')+'\n');
+    else if(fmt==='xlsx'){ const keys = ['tipo'].concat(BIB_ALL_FIELDS);
+      downloadXLSX(base+'.xlsx', [{name:'Referencias', aoa: [['Cita APA 7'].concat(keys.map(k=>k==='tipo' ? 'Tipo' : (BIB_LABELS[k]||k).replace(/ \(.*$/,'')), ['Colecciones'])].concat(list.map(r=>[bibPlain(bibFormatAPA(r))].concat(keys.map(k=>k==='tipo' ? ((BIB_TYPES[r.tipo]||{}).label||r.tipo) : (r[k]||'')), [(r.colecciones||[]).join('; ')])))}], ['Bibliografía exportada desde '+APP_LABEL]); }
+    else { const html = `<h1>Referencias</h1>` + list.map(r=>`<p>${bibFormatAPA(r)}</p>`).join('');
+      universalDownload(base+'.docx', new Blob([htmlToDocxBytes(html, 'Referencias')], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'})); }
+    logEvent('carga', `Bibliografía exportada (${list.length} referencias, formato ${fmt.toUpperCase()}).`);
+    closeModal(false);
+  };
+}
+// --- enlaces: páginas web y videos ---
+function bibLinkInfo(url){
+  let u; try{ u = new URL(/^https?:\/\//i.test(url) ? url : 'https://'+url); }catch(e){ return null; }
+  const host = u.hostname.replace(/^www\.|^m\./,'');
+  const video = /(^|\.)(youtube\.com|youtu\.be|vimeo\.com|dailymotion\.com|tiktok\.com|twitch\.tv)$/.test(host) || (host==='facebook.com' && /\/videos?\//.test(u.pathname)) || (host==='instagram.com' && /\/(reel|tv)\//.test(u.pathname));
+  const platform = /youtu/.test(host) ? 'YouTube' : /vimeo/.test(host) ? 'Vimeo' : /dailymotion/.test(host) ? 'Dailymotion' : /tiktok/.test(host) ? 'TikTok' : /twitch/.test(host) ? 'Twitch' : /facebook/.test(host) ? 'Facebook' : /instagram/.test(host) ? 'Instagram' : '';
+  // nombre del sitio: la parte principal del dominio, sin terminaciones (".com.ar", ".gob.ar", ".org"…)
+  const parts = host.split('.'), generic = /^(com|gob|gov|org|edu|net|ac|co|mil|int|nic)$/;
+  let main = parts.length>2 && parts[parts.length-1].length===2 && generic.test(parts[parts.length-2]) ? parts[parts.length-3] : parts[Math.max(0, parts.length-2)];
+  const site = platform || (main ? main.charAt(0).toUpperCase() + main.slice(1) : host);
+  return {url: u.href, video, platform, site};
+}
+function openBibLinkDialog(){
+  showModal('Agregar una página web o un video', `<p class="hint">Pegá el enlace. Telar reconoce si es un video (YouTube, Vimeo y otras plataformas) o una página web y prepara la referencia para completar.</p>
+    <div class="field" style="max-width:100%"><label>Enlace</label><input type="text" id="bl-url" placeholder="https://www.youtube.com/watch?v=… o https://…" style="width:100%"></div>
+    <label class="chk-opt" style="margin:8px 0"><input type="checkbox" id="bl-net"> Completar título y autor desde internet (videos). Consulta el enlace al servicio externo noembed.com; requiere conexión.</label>
+    <button class="go" id="bl-ok">Continuar</button><span id="bl-msg" class="hint" style="margin-left:8px"></span>`);
+  document.getElementById('bl-ok').onclick = async ()=>{
+    const info = bibLinkInfo(document.getElementById('bl-url').value.trim()), msg = document.getElementById('bl-msg');
+    if(!info){ msg.textContent = 'El enlace no es válido.'; return; }
+    const fields = {tipo: info.video ? 'video' : 'web', enlace: info.url, fuente: info.video ? info.platform : info.site}, origins = {tipo:'enlace', enlace:'enlace', fuente:'enlace'};
+    if(info.video && document.getElementById('bl-net').checked){
+      msg.textContent = 'Consultando…';
+      try{ const r = await fetch('https://noembed.com/embed?url='+encodeURIComponent(info.url)); const j = await r.json();
+        if(j.title){ fields.titulo = j.title; origins.titulo = 'internet'; } if(j.author_name){ fields.autores = j.author_name.replace(/,/g,' '); origins.autores = 'internet'; } if(j.provider_name){ fields.fuente = j.provider_name; }
+      }catch(e){ msg.textContent = 'No se pudo consultar (sin conexión o servicio no disponible). Completá los datos a mano.'; await new Promise(r=>setTimeout(r, 900)); }
+    }
+    closeModal(false); showMainPanel('biblio'); bibOpenEditor(fields, origins);
+    document.getElementById('bib-msg').textContent = info.video ? 'Video: revisá el título, el autor o canal y la fecha de publicación.' : 'Página web: completá el título, el autor o institución y la fecha, si la tiene (si no, se usa "s. f.").';
+  };
+}
+// --- archivos Word: título, autor y fecha guardados en el propio archivo ---
+async function bibHandleWord(file){
+  const msg = document.getElementById('bib-msg'); msg.textContent = 'Leyendo "'+file.name+'"…';
+  const fields = {tipo:'documento', enlace: file.name, detalle:'Documento de Word'}, origins = {tipo:'archivo', detalle:'archivo'};
+  try{
+    const buf = new Uint8Array(await readFileAs(file, 'buffer'));
+    try{ const z = XLSX.CFB.read(buf, {type:'array'}), e = XLSX.CFB.find(z, '/docProps/core.xml') || XLSX.CFB.find(z, 'docProps/core.xml');
+      if(e && e.content){ const x = new TextDecoder().decode(e.content instanceof Uint8Array ? e.content : new Uint8Array(e.content)), tag = t=>{ const m = x.match(new RegExp('<'+t+'[^>]*>([\\s\\S]*?)</'+t+'>')); return m ? m[1].replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').trim() : ''; };
+        const title = tag('dc:title'), creator = tag('dc:creator'), created = tag('dcterms:created');
+        if(title){ fields.titulo = title; origins.titulo = 'propiedades del archivo'; }
+        if(creator && !/^(usuario|user|admin|autor|author|windows)$/i.test(creator)){ const p = creator.trim().split(/\s+/); fields.autores = p.length>1 ? p[p.length-1]+', '+p.slice(0,-1).join(' ') : creator; origins.autores = 'propiedades del archivo'; }
+        if(/^\d{4}/.test(created)){ fields.anio = created.slice(0,4); origins.anio = 'propiedades del archivo (fecha de creación)'; } } }catch(e){}
+    if(!fields.titulo && window.mammoth){ const r = await mammoth.extractRawText({arrayBuffer: buf.buffer}); const first = (r.value||'').split('\n').map(s=>s.trim()).find(s=>s.length>3);
+      if(first){ fields.titulo = first.slice(0, 200); origins.titulo = 'primera línea del documento'; } }
+    if(!fields.titulo){ fields.titulo = file.name.replace(/\.[^.]+$/,'').replace(/[_]+/g,' '); origins.titulo = 'nombre del archivo'; }
+    showMainPanel('biblio'); bibOpenEditor(fields, origins);
+    msg.textContent = 'Datos tomados del archivo: revisalos. Las propiedades de un Word a veces tienen el nombre de quien instaló el programa en lugar del autor. El archivo no se guarda.';
+  }catch(err){ msg.textContent = 'No se pudo leer el archivo. Podés cargar los datos a mano.'; bibOpenEditor({tipo:'documento'}, {}); }
+}
+/* ===== BIBLIOGRAFÍA: colecciones, exportación, enlaces y archivos Word (fin) ===== */
+/* ===== TAREAS (inicio) ===== */
+function projectTasks(){ project.tasks = project.tasks || []; return project.tasks; }
+function updateTasksFab(){ const b = document.getElementById('tasks-fab-btn'); if(!b) return; const n = projectTasks().filter(t=>!t.done).length; b.textContent = '☑ Tareas' + (n ? ' ('+n+')' : ''); }
+function openTasks(){
+  const T = projectTasks(); let hideDone = !!project.tasksHideDone;
+  const row = t=>`<div class="task-row${t.done ? ' done' : ''}" data-id="${t.id}"><input type="checkbox" class="task-done" ${t.done ? 'checked' : ''} title="Completada"><input type="text" class="task-text" value="${esc(t.text)}" placeholder="Escribí la tarea…"><button type="button" class="task-del" title="Borrar">×</button></div>`;
+  const render = ()=>{ const list = document.getElementById('tasks-list'); if(!list) return;
+    const vis = T.filter(t=>!(hideDone && t.done));
+    list.innerHTML = vis.length ? vis.map(row).join('') : `<p class="hint" style="margin:6px 0">${T.length ? 'Todas las tareas están completadas.' : 'Todavía no hay tareas.'}</p>`;
+    document.getElementById('tasks-summary').textContent = T.length ? `${T.filter(t=>t.done).length} de ${T.length} completadas` : ''; updateTasksFab(); };
+  showModal('☑ Lista de tareas', `<p class="hint">Tareas del proyecto, con su casilla para marcarlas como hechas. Se guardan solas con el proyecto.</p>
+    <div id="tasks-list" style="display:flex;flex-direction:column;gap:6px"></div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px">
+      <button class="go" id="tasks-add">+ Agregar tarea</button>
+      <label class="chk-opt"><input type="checkbox" id="tasks-hide" ${hideDone ? 'checked' : ''}> Ocultar completadas</label>
+      <button class="mini-export" id="tasks-clear" title="Borra las tareas marcadas como hechas">Borrar completadas</button>
+      <span id="tasks-summary" class="hint" style="margin:0 0 0 auto"></span></div>`);
+  const list = document.getElementById('tasks-list'), save = ()=>{ persistSession(); updateTasksFab(); };
+  list.addEventListener('input', e=>{ const r = e.target.closest('.task-row'); if(!r || !e.target.classList.contains('task-text')) return; const t = T.find(x=>x.id===r.dataset.id); if(t){ t.text = e.target.value; clearTimeout(list.__t); list.__t = setTimeout(save, 500); } });
+  list.addEventListener('change', e=>{ const r = e.target.closest('.task-row'); if(!r || !e.target.classList.contains('task-done')) return; const t = T.find(x=>x.id===r.dataset.id); if(t){ t.done = e.target.checked; t.doneAt = t.done ? new Date().toISOString() : null; save(); render(); } });
+  list.addEventListener('click', e=>{ const b = e.target.closest('.task-del'); if(!b) return; const i = T.findIndex(x=>x.id===b.closest('.task-row').dataset.id); if(i>=0){ T.splice(i,1); save(); render(); } });
+  list.addEventListener('keydown', e=>{ if(e.key==='Enter' && e.target.classList.contains('task-text')){ e.preventDefault(); document.getElementById('tasks-add').click(); } });
+  document.getElementById('tasks-add').onclick = ()=>{ T.push({id: bibNewId(), text:'', done:false, created: new Date().toISOString()}); save(); render(); const inputs = list.querySelectorAll('.task-text'); if(inputs.length) inputs[inputs.length-1].focus(); };
+  document.getElementById('tasks-hide').onchange = e=>{ hideDone = project.tasksHideDone = e.target.checked; save(); render(); };
+  document.getElementById('tasks-clear').onclick = ()=>{ const n = T.filter(t=>t.done).length; if(!n) return; if(!confirm(`¿Borrar las ${n} tareas completadas?`)) return; for(let i=T.length-1;i>=0;i--) if(T[i].done) T.splice(i,1); save(); render(); };
+  render();
+}
+/* ===== TAREAS (fin) ===== */
+
 function renderBibliography(){
   updateMainTabCounts();
   const wrap = document.getElementById('bib-list'); if(!wrap) return;
   const bar = document.getElementById('bib-list-bar');
-  const list = bibSorted(references);
-  const cnt = document.getElementById('bib-count'); if(cnt) cnt.textContent = list.length ? ' ('+list.length+')' : '';
-  if(!list.length){ wrap.innerHTML = '<p class="empty">Todavía no hay referencias. Subí un PDF o cargá una a mano.</p>'; bar.innerHTML = ''; return; }
-  const marked = list.filter(r=>r.inReport).length;
+  const all = bibSorted(references), cols = bibCollections();
+  if(bibColFilter && bibColFilter!=='__none__' && !cols.includes(bibColFilter)) bibColFilter = '';
+  const list = bibVisible();
+  const cnt = document.getElementById('bib-count'); if(cnt) cnt.textContent = all.length ? ' ('+all.length+')' : '';
+  if(!all.length){ wrap.innerHTML = '<p class="empty">Todavía no hay referencias. Subí un PDF o un Word, agregá un enlace o cargá una a mano.</p>'; bar.innerHTML = ''; return; }
+  const marked = all.filter(r=>r.inReport).length;
   bar.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:16px 0 4px">
     <button type="button" class="go" id="bib-report-btn" data-bib-bar="report">📌 Agregar las marcadas al informe (${marked})</button>
     <button type="button" class="mini-export" data-bib-bar="copyall" style="font-size:.8rem;padding:7px 12px">⧉ Copiar las marcadas</button>
-    <button type="button" class="mini-export" data-bib-bar="ris" style="font-size:.8rem;padding:7px 12px">⭳ Exportar RIS (Zotero, Mendeley)</button>
-  </div><p class="hint" style="margin:0 0 6px">La casilla de cada referencia define cuáles entran al informe, a la copia y al RIS.</p>`;
+    <button type="button" class="mini-export" data-bib-bar="export" style="font-size:.8rem;padding:7px 12px">⭳ Exportar… (Word, RIS, BibTeX, Excel)</button>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0 6px">
+    <label class="hint" style="margin:0">Colección <select id="bib-col-filter"><option value="">Todas (${all.length})</option>${cols.map(c=>`<option value="${esc(c)}" ${bibColFilter===c ? 'selected' : ''}>${esc(c)} (${all.filter(r=>(r.colecciones||[]).includes(c)).length})</option>`).join('')}<option value="__none__" ${bibColFilter==='__none__' ? 'selected' : ''}>Sin colección (${all.filter(r=>!(r.colecciones||[]).length).length})</option></select></label>
+    <button type="button" class="mini-export" data-bib-bar="colmgr" style="font-size:.8rem;padding:6px 10px">🗂 Colecciones…</button>
+    <button type="button" class="mini-export" data-bib-bar="markall" style="font-size:.8rem;padding:6px 10px">Marcar las visibles</button>
+    <button type="button" class="mini-export" data-bib-bar="marknone" style="font-size:.8rem;padding:6px 10px">Desmarcar todas</button>
+  </div><p class="hint" style="margin:0 0 6px">La casilla de cada referencia define cuáles entran al informe y a la copia; al exportar se elige entre todas, las marcadas o una colección.${bibColFilter ? ` Se muestran ${list.length} de ${all.length}.` : ''}</p>`;
   wrap.innerHTML = list.map(r=>`<div class="bib-item" style="padding:10px 0;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-start">
     <input type="checkbox" data-bib-inc="${r.id}" ${r.inReport?'checked':''} title="Incluir en el informe" style="margin-top:4px">
     <div style="flex:1;min-width:0">
-      <div style="padding-left:2em;text-indent:-2em;font-size:.88rem;line-height:1.55">${bibFormatAPA(r)}</div>
+      <div style="padding-left:2em;text-indent:-2em;font-size:.88rem;line-height:1.55">${bibFormatAPA(r)}</div>${(r.colecciones||[]).length ? `<div style="margin-top:4px">${bibColChips(r)}</div>` : ''}
       <div style="margin-top:5px;display:flex;gap:6px;flex-wrap:wrap">
         <button type="button" class="mini-export" data-bib-act="copy" data-id="${r.id}">Copiar cita</button>
         <button type="button" class="mini-export" data-bib-act="cite" data-id="${r.id}">Copiar ${esc(bibInText(r))}</button>
+        <button type="button" class="mini-export" data-bib-act="cols" data-id="${r.id}">🗂 Colecciones</button>
         <button type="button" class="mini-export" data-bib-act="edit" data-id="${r.id}">Editar</button>
         <button type="button" class="mini-export" data-bib-act="del" data-id="${r.id}" style="color:var(--rust)">Quitar</button>
       </div>
@@ -9741,14 +9928,16 @@ async function bibHandlePdf(file){
 document.getElementById('bib-pdf-input').addEventListener('change', e=>{
   const f = e.target.files && e.target.files[0];
   e.target.value = '';
-  if(f) bibHandlePdf(f);
+  if(f) (/\.docx$/i.test(f.name) ? bibHandleWord(f) : bibHandlePdf(f));
 });
+document.getElementById('bib-link-btn').addEventListener('click', openBibLinkDialog);
 document.getElementById('bib-list').addEventListener('click', async e=>{
   const btn = e.target.closest('[data-bib-act]'); if(!btn) return;
   const r = references.find(x=>x.id===btn.dataset.id); if(!r) return;
   const act = btn.dataset.bibAct;
   if(act==='copy'){ const h = bibFormatAPA(r); await bibCopy(h, bibPlain(h), btn); }
   else if(act==='cite'){ const t = bibInText(r); await bibCopy(esc(t), t, btn); }
+  else if(act==='cols'){ openBibCollectionsFor(r); }
   else if(act==='edit'){ document.getElementById('bib-msg').textContent = ''; bibOpenEditor(r, {}); document.getElementById('bib-editor').scrollIntoView({behavior:'smooth', block:'center'}); }
   else if(act==='del'){ if(confirm('¿Quitar esta referencia de la lista?')){ references = references.filter(x=>x.id!==r.id); persistSession(); renderBibliography(); } }
 });
@@ -9762,6 +9951,10 @@ document.getElementById('bib-list-bar').addEventListener('click', async e=>{
   const what = btn.dataset.bibBar;
   if(what==='report') bibAddToReport();
   else if(what==='ris') bibExportRIS();
+  else if(what==='export') openBibExport();
+  else if(what==='colmgr') openBibCollectionsManager();
+  else if(what==='markall'){ bibVisible().forEach(r=>{ r.inReport = true; }); persistSession(); renderBibliography(); }
+  else if(what==='marknone'){ references.forEach(r=>{ r.inReport = false; }); persistSession(); renderBibliography(); }
   else if(what==='copyall'){
     const ids = references.filter(r=>r.inReport).map(r=>r.id);
     if(!ids.length){ alert('Marcá al menos una referencia con la casilla.'); return; }
@@ -9769,6 +9962,7 @@ document.getElementById('bib-list-bar').addEventListener('click', async e=>{
     await bibCopy(bibRefsListHtml(ids), plain, btn);
   }
 });
+document.getElementById('bib-list-bar').addEventListener('change', e=>{ if(e.target.id==='bib-col-filter'){ bibColFilter = e.target.value; renderBibliography(); } });
 renderBibliography();
 /* ===== BIBLIOGRAFÍA: interfaz (fin) ===== */
 
@@ -10068,6 +10262,7 @@ function applySession(bundle, mode){
 }
 
 function refreshAllAfterSession(){
+  try{ updateTasksFab(); }catch(e){}
   try{ applyModules(); }catch(e){}
   resetStatusLists();
   addRestoredStatusLines();
