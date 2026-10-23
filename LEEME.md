@@ -1,4 +1,4 @@
-# Telar · Asistente de investigación — versión 0.14.2 (beta)
+# Telar · Asistente de investigación — versión 0.14.3 (beta)
 
 Telar integra el análisis de bases de datos y encuestas, relatos fechados, entrevistas y codificación cualitativa en una sola herramienta. Funciona entera en el navegador: **los archivos de cada persona se procesan en su computadora y no se envían a ningún servidor.**
 
@@ -98,8 +98,13 @@ Quienes ya tengan la app abierta o instalada ven el aviso **"Hay una versión nu
 
 ## Cómo citarla
 
-Telar · Asistente de investigación, versión 0.14.2 (beta). La versión figura también en cada informe, anexo metodológico y archivo exportado.
+Telar · Asistente de investigación, versión 0.14.3 (beta). La versión figura también en cada informe, anexo metodológico y archivo exportado.
 
 ## Licencias
 
 Las librerías y tipografías incluidas tienen licencias libres (Apache 2.0, MIT, BSD y SIL Open Font License); el detalle está en `LICENCIAS-DE-TERCEROS.txt`.
+
+
+## Novedades de cada versión
+
+El archivo `novedades.json` contiene la lista de novedades de cada versión. Cuando hay una actualización, Telar la muestra en el aviso que aparece arriba ("Ver novedades"). Con cada versión nueva se agrega su entrada al comienzo de la lista y se sube junto con `index.html` y `sw.js`.

@@ -1,9 +1,9 @@
 // Telar: funcionamiento sin conexión.
 // Al publicar una versión nueva, cambiar VERSION (y APP_VERSION en index.html): la app avisa que hay una actualización.
-const VERSION = '0.14.2';
+const VERSION = '0.14.3';
 const CACHE = 'telar-' + VERSION;
 const ASSETS = [
-  './', './index.html', './manifest.webmanifest', './sample-project.js',
+  './', './index.html', './manifest.webmanifest', './sample-project.js', './novedades.json',
   './vendor/xlsx.full.min.js', './vendor/chart.umd.min.js',
   './vendor/leaflet/leaflet.js',
   './vendor/leaflet/leaflet.css',
@@ -27,7 +27,9 @@ self.addEventListener('fetch', e=>{
   const url = new URL(e.request.url);
   if(e.request.method!=='GET' || url.origin!==self.location.origin) return; // lo externo (CrossRef) va directo a la red
   // la página principal: primero internet (así se ve enseguida lo último que se publicó); sin conexión, la copia guardada
+  // la página principal y la lista de novedades: primero internet; sin conexión, la copia guardada
   const isPage = e.request.mode==='navigate' || /\/(index\.html)?$/.test(url.pathname);
+  if(/\/novedades\.json$/.test(url.pathname)){ e.respondWith(fetch(e.request, {cache:'no-store'}).catch(()=>caches.match('./novedades.json', {ignoreSearch:true}))); return; }
   if(isPage){
     e.respondWith(fetch(e.request, {cache:'no-cache'}).then(res=>{
       if(res.ok){ const copy = res.clone(); caches.open(CACHE).then(c=>c.put('./index.html', copy)); }

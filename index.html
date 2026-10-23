@@ -46,6 +46,14 @@
 .ocr-text{border:1px solid var(--line);border-radius:4px;padding:8px 12px;min-height:220px;max-height:46vh;overflow:auto;background:var(--panel);font-size:.9rem;line-height:1.6}
 .ocr-text p{margin:0 0 8px}
 .mode-in-menu{display:none}
+#update-bar{position:sticky;top:0;z-index:60;background:var(--teal-d);color:#fff;box-shadow:0 3px 14px rgba(0,0,0,.3)}
+#update-bar .ub-row{display:flex;gap:14px;align-items:center;flex-wrap:wrap;max-width:1180px;margin:0 auto;padding:10px 18px;font-size:.92rem}
+#update-bar .ub-actions{margin-left:auto;display:flex;gap:8px}
+#update-bar .ub-go{background:#fff;color:var(--teal-d);border:none;border-radius:6px;padding:7px 16px;font:inherit;font-weight:600;cursor:pointer}
+#update-bar .ub-later{background:transparent;border:1px solid rgba(255,255,255,.55);color:#fff;border-radius:6px;padding:6px 12px;font:inherit;font-size:.85rem;cursor:pointer}
+#update-bar .ub-link{background:none;border:none;color:#fff;text-decoration:underline;cursor:pointer;font:inherit;font-size:.88rem;padding:0}
+#update-bar .ub-list{max-width:1180px;margin:0 auto;padding:2px 18px 12px;max-height:45vh;overflow:auto;font-size:.88rem}
+#update-bar .ub-list ul{margin:4px 0 10px 20px;padding:0}#update-bar .ub-list li{margin:2px 0}
 .task-row{display:flex;gap:8px;align-items:center}.task-row .task-text{flex:1;font:inherit;font-size:.9rem;padding:6px 8px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink)}
 .task-row.done .task-text{text-decoration:line-through;color:var(--sub)}.task-row .task-del{border:none;background:none;color:var(--rust);font-size:1.2rem;cursor:pointer;padding:0 6px}
 .bib-chip{display:inline-block;padding:1px 8px;border-radius:999px;background:rgba(47,107,110,.12);font-size:.75rem;margin-right:4px}
@@ -674,7 +682,7 @@ tbody tr:hover{background:var(--accent-bg)}
 
 <script>
 // ===== Versión de Telar (al publicar una nueva, cambiar acá y en sw.js) =====
-const APP_VERSION = '0.14.2';
+const APP_VERSION = '0.14.3';
 const APP_CHANNEL = 'beta';
 const APP_LABEL = 'Telar ' + APP_VERSION + ' ' + APP_CHANNEL;
 // Dirección del formulario de comentarios (ej. un Formulario de Google). Vacía: se explica cómo configurarla.
@@ -10077,12 +10085,37 @@ document.getElementById('install-btn').addEventListener('click', async ()=>{ if(
 // --- Abrir archivos desde el sistema (doble clic en un .xlsx, .csv, .docx o .sav, con la app instalada) ---
 if('launchQueue' in window){ window.launchQueue.setConsumer(async params=>{ if(!params.files || !params.files.length) return; for(const h of params.files){ try{ const f = await h.getFile(); if(/\.(telar|json)$/i.test(f.name)) openProjectFile(f, h); else loadFile(f); }catch(e){ noteError(e.message); } } }); }
 // --- Funcionamiento sin conexión y aviso de versión nueva (solo publicada por https o en localhost) ---
+// --- Aviso de versión nueva: franja arriba, con la lista de novedades desplegable ---
+function versionCmp(a, b){ const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number);
+  for(let i=0;i<Math.max(pa.length, pb.length);i++){ const d = (pa[i]||0) - (pb[i]||0); if(d) return d; } return 0; }
+async function loadNovedades(){
+  // 1) la copia que ya descargó la versión nueva mientras espera (funciona también sin conexión)
+  try{ if(window.caches){
+    const keys = (await caches.keys()).filter(k=>/^telar-\d/.test(k) && k!=='telar-'+APP_VERSION).sort((a,b)=>versionCmp(b.slice(6), a.slice(6)));
+    for(const k of keys){ const c = await caches.open(k); const r = await c.match('novedades.json', {ignoreSearch:true}) || await c.match('./novedades.json', {ignoreSearch:true}); if(r) return await r.json(); } } }catch(e){}
+  // 2) el archivo publicado en el sitio
+  try{ const r = await fetch('novedades.json?t='+Date.now(), {cache:'no-store'}); if(r.ok) return await r.json(); }catch(e){}
+  return null;
+}
 function showUpdateToast(reg){
-  if(document.getElementById('update-toast')) return;
-  const t = document.createElement('div'); t.className = 'toast'; t.id = 'update-toast'; t.setAttribute('role','status');
-  t.innerHTML = '<span>Hay una versión nueva de Telar.</span><button type="button">Actualizar</button>';
-  t.querySelector('button').onclick = async ()=>{ t.querySelector('button').disabled = true; clearTimeout(persistTimer); await writeSessionNow(); if(reg.waiting) reg.waiting.postMessage({type:'SKIP_WAITING'}); };
-  document.body.appendChild(t);
+  if(document.getElementById('update-bar')) return;
+  const bar = document.createElement('div'); bar.id = 'update-bar'; bar.setAttribute('role','status');
+  bar.innerHTML = `<div class="ub-row"><span class="ub-msg">🔄 Hay una versión nueva de Telar<span id="ub-ver"></span>.</span>
+      <button type="button" id="ub-toggle" class="ub-link" hidden aria-expanded="false" aria-controls="ub-list">Ver novedades ▾</button>
+      <span class="ub-actions"><button type="button" id="ub-go" class="ub-go">Actualizar</button><button type="button" id="ub-later" class="ub-later" title="El aviso vuelve a aparecer la próxima vez que abras Telar">Más tarde</button></span></div>
+    <div id="ub-list" class="ub-list" hidden></div>`;
+  document.body.prepend(bar);
+  document.getElementById('ub-go').onclick = async ()=>{ const b = document.getElementById('ub-go'); b.disabled = true; b.textContent = 'Actualizando…'; clearTimeout(persistTimer); await writeSessionNow(); if(reg && reg.waiting) reg.waiting.postMessage({type:'SKIP_WAITING'}); };
+  document.getElementById('ub-later').onclick = ()=>bar.remove();
+  loadNovedades().then(n=>{
+    const list = document.getElementById('ub-list'), tg = document.getElementById('ub-toggle'); if(!list || !n || !Array.isArray(n.versiones)) return;
+    const vs = n.versiones.filter(v=>v && v.version && versionCmp(v.version, APP_VERSION)>0).sort((a,b)=>versionCmp(b.version, a.version));
+    if(!vs.length) return;
+    document.getElementById('ub-ver').textContent = ' ('+vs[0].version+')';
+    list.innerHTML = vs.map(v=>`<div class="ub-v"><strong>Versión ${esc(v.version)}</strong>${v.fecha ? ' · '+esc(v.fecha) : ''}<ul>${(v.novedades||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`).join('');
+    tg.hidden = false;
+    tg.onclick = ()=>{ const open = list.hidden; list.hidden = !open; tg.setAttribute('aria-expanded', String(open)); tg.textContent = open ? 'Ocultar novedades ▴' : 'Ver novedades ▾'; };
+  });
 }
 if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
   window.addEventListener('load', ()=>{

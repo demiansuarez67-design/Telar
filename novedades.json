@@ -1,0 +1,74 @@
+{
+ "versiones": [
+  {
+   "version": "0.14.3",
+   "fecha": "23/10/2026",
+   "novedades": [
+    "El aviso de actualización aparece arriba, con la lista de novedades desplegable."
+   ]
+  },
+  {
+   "version": "0.14.2",
+   "fecha": "22/10/2026",
+   "novedades": [
+    "Lista de tareas del proyecto, con casillas para marcarlas como hechas (botón ☑ Tareas).",
+    "Bibliografía: colecciones por tema o tópico, como en Zotero.",
+    "Bibliografía: exportar todas las referencias, las marcadas o una colección, en Word (APA 7), RIS, BibTeX o Excel.",
+    "Bibliografía: nuevos tipos de referencia — páginas web, videos de YouTube u otras plataformas y documentos de Word."
+   ]
+  },
+  {
+   "version": "0.14.1",
+   "fecha": "18/10/2026",
+   "novedades": [
+    "Entrevistas: se corrigió la lectura de transcripciones que empiezan con «Entrevistador:» seguido de una pregunta.",
+    "Entrevistas: unir a mano hablantes repetidos en «Datos de la entrevista».",
+    "La solapa Especificidades pasó al final; el anexo y el glosario se pueden plegar."
+   ]
+  },
+  {
+   "version": "0.14.0",
+   "fecha": "18/10/2026",
+   "novedades": [
+    "Codificación por diccionario: reglas de palabras que proponen códigos, con comparación contra la codificación manual (kappa).",
+    "Red de palabras en el análisis de palabras.",
+    "Mapa: ya no tapa las ventanas; el fondo de OpenStreetMap se ve bien al acercar y las etiquetas no se superponen."
+   ]
+  },
+  {
+   "version": "0.13.4",
+   "fecha": "18/10/2026",
+   "novedades": [
+    "Pasar relatos a una base: Telar propone el registro de cada relato (organización, forma, empresa, lugar…) para revisar y sumar, y mide cuánto acierta con tus datos."
+   ]
+  },
+  {
+   "version": "0.13.3",
+   "fecha": "18/10/2026",
+   "novedades": [
+    "Registros filtrados: marcar celdas con posibles errores (tipeos, valores ilegibles, atípicos, fechas dudosas, duplicados) y exportar la lista para corregir."
+   ]
+  },
+  {
+   "version": "0.13.2",
+   "fecha": "18/10/2026",
+   "novedades": [
+    "«Conflictividad» pasó a llamarse «Indicadores» y sirve para cualquier base con fecha: cantidad, suma o promedio, criterios ajustables y estacionalidad."
+   ]
+  },
+  {
+   "version": "0.13.1",
+   "fecha": "18/10/2026",
+   "novedades": [
+    "El mapa tiene su propia solapa; varios análisis pasaron a la lista «Más análisis»; red de actores con varias columnas; unión de seudónimos."
+   ]
+  },
+  {
+   "version": "0.13.0",
+   "fecha": "18/10/2026",
+   "novedades": [
+    "Mapa con coordenadas reales, red de actores, indicadores de conflictividad, mapas mentales y módulos por proyecto."
+   ]
+  }
+ ]
+}
