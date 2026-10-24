@@ -682,7 +682,7 @@ tbody tr:hover{background:var(--accent-bg)}
 
 <script>
 // ===== Versión de Telar (al publicar una nueva, cambiar acá y en sw.js) =====
-const APP_VERSION = '0.14.3';
+const APP_VERSION = '0.14.4';
 const APP_CHANNEL = 'beta';
 const APP_LABEL = 'Telar ' + APP_VERSION + ' ' + APP_CHANNEL;
 // Dirección del formulario de comentarios (ej. un Formulario de Google). Vacía: se explica cómo configurarla.
@@ -9186,7 +9186,7 @@ const BIB_TYPES = {
 };
 const BIB_LABELS = {
   autores:'Autores (uno por línea: Apellido, Nombre)', editores:'Editores del libro (uno por línea: Apellido, Nombre)',
-  anio:'Año', fecha:'Día y mes (ej. 9 de enero)', titulo:'Título', fuente:'Fuente', volumen:'Volumen', numero:'Número',
+  anio:'Año', fecha:'Día y mes (ej. 9 de enero)', titulo:'Título', fuente:'Fuente', volumen:'Volumen o año', numero:'Número',
   paginas:'Páginas (ej. 45-67)', edicion:'Edición (ej. 2.ª)', editorial:'Editorial', detalle:'Detalle (ej. Tesis doctoral, Universidad X)', enlace:'DOI o enlace'
 };
 const BIB_ALL_FIELDS = ['autores','editores','anio','fecha','titulo','fuente','volumen','numero','paginas','edicion','editorial','detalle','enlace'];
@@ -9250,7 +9250,10 @@ function bibFormatAPA(r){
   let body = [];
   switch(r.tipo){
     case 'articulo': {
-      const vn = (r.volumen ? it(esc(String(r.volumen).trim())) : '') + (r.numero ? '('+esc(String(r.numero).trim())+')' : '');
+      // numeración por volumen: 12(3); por año (revistas que usan "Año X, Número Y"): Año 12, n.º 3
+      const vn = r.volTipo==='anio'
+        ? [r.volumen ? 'Año '+esc(String(r.volumen).trim()) : '', r.numero ? 'n.º '+esc(String(r.numero).trim()) : ''].filter(Boolean).join(', ')
+        : (r.volumen ? it(esc(String(r.volumen).trim())) : '') + (r.numero ? '('+esc(String(r.numero).trim())+')' : '');
       const segs = [r.fuente ? it(esc(String(r.fuente).trim())) : '', vn, pag ? esc(pag) : ''].filter(Boolean);
       body = [bibEndDot(t), segs.length ? bibEndDot(segs.join(', ')) : '', link];
       break; }
@@ -9285,7 +9288,9 @@ function bibFormatAPA(r){
       body = [bibEndDot(it(t) + (r.numero ? ' ('+esc(String(r.numero).trim())+')' : '')), (edit && !sameAsAuthor) ? bibEndDot(edit) : '', link];
   }
   body = body.filter(Boolean);
-  if(authorStr) return (bibEndDot(esc(authorStr)) + ' (' + esc(datePart) + '). ' + body.join(' ')).trim();
+  // compiladores, editores o coordinadores: "García, A. (Comp.)." / "García, A. y López, B. (Comps.)."
+  const role = BIB_ROLES[r.rolAutores] && r.rolAutores!=='autor' ? BIB_ROLES[r.rolAutores][A.length>1 ? 1 : 0] : '';
+  if(authorStr) return (bibEndDot(esc(authorStr) + (role ? ' ('+role+')' : '')) + ' (' + esc(datePart) + '). ' + body.join(' ')).trim();
   const first = body.shift() || '';
   return (first + ' (' + esc(datePart) + '). ' + body.join(' ')).trim();
 }
@@ -9319,7 +9324,7 @@ const BIB_RIS_TYPES = {articulo:'JOUR', libro:'BOOK', capitulo:'CHAP', tesis:'TH
 function bibToRIS(r){
   const L = ['TY  - '+(BIB_RIS_TYPES[r.tipo]||'GEN')];
   const person = a=>a.org || (a.family + (a.given ? ', '+a.given : ''));
-  bibParseAuthors(r.autores).forEach(a=>L.push('AU  - '+person(a)));
+  bibParseAuthors(r.autores).forEach(a=>L.push((r.rolAutores && r.rolAutores!=='autor' ? 'ED  - ' : 'AU  - ')+person(a)));
   bibParseAuthors(r.editores).forEach(a=>L.push('A2  - '+person(a)));
   if(r.anio) L.push('PY  - '+r.anio);
   if(r.titulo) L.push('TI  - '+r.titulo);
@@ -9582,8 +9587,12 @@ async function bibFetchCrossref(doi){
 }
 
 function bibNewId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+const BIB_ROLES = {autor:['',''], comp:['Comp.','Comps.'], ed:['Ed.','Eds.'], coord:['Coord.','Coords.']};
 function bibFieldHtml(k){
   const wide = ['autores','editores','titulo','enlace','detalle'].includes(k);
+  if(k==='autores') return `<div class="field bib-field" data-f="autores" style="max-width:100%;grid-column:1/-1"><label>${esc(BIB_LABELS.autores)}</label><textarea id="bib-f-autores" class="bib-ta" rows="3"></textarea>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:4px"><span class="hint" style="margin:0">Los nombres de arriba son</span><select id="bib-f-rol"><option value="autor">autores/as</option><option value="comp">compiladores/as (Comp.)</option><option value="ed">editores/as (Ed.)</option><option value="coord">coordinadores/as (Coord.)</option></select></div><span class="bib-origin" data-origin-for="autores"></span></div>`;
+  if(k==='volumen') return `<div class="field bib-field" data-f="volumen" style="max-width:100%"><label>${esc(BIB_LABELS.volumen)}</label><div style="display:flex;gap:6px"><input type="text" id="bib-f-volumen" style="flex:1;min-width:60px"><select id="bib-f-voltipo" title="Algunas revistas numeran por año: Año 12, n.º 3"><option value="vol">Volumen</option><option value="anio">Año</option></select></div><span class="bib-origin" data-origin-for="volumen"></span></div>`;
   const input = (k==='autores'||k==='editores')
     ? `<textarea id="bib-f-${k}" class="bib-ta" rows="${k==='autores'?3:2}"></textarea>`
     : `<input type="text" id="bib-f-${k}" style="width:100%">`;
@@ -9610,6 +9619,8 @@ function bibReadForm(){
   const vis = (BIB_TYPES[tipo]||BIB_TYPES.informe).fields;
   const r = {tipo};
   BIB_ALL_FIELDS.forEach(k=>{ const el = document.getElementById('bib-f-'+k); r[k] = (el && vis.includes(k)) ? el.value.trim() : ''; });
+  const rol = document.getElementById('bib-f-rol'); if(rol && vis.includes('autores') && rol.value!=='autor') r.rolAutores = rol.value;
+  const vt = document.getElementById('bib-f-voltipo'); if(vt && vis.includes('volumen') && vt.value==='anio') r.volTipo = 'anio';
   return r;
 }
 function bibApplyType(){
@@ -9653,9 +9664,11 @@ function bibOpenEditor(ref, origins){
   const r = ref || {tipo:'articulo'};
   document.getElementById('bib-f-tipo').value = r.tipo || 'articulo';
   BIB_ALL_FIELDS.forEach(k=>{ const el = document.getElementById('bib-f-'+k); if(el) el.value = r[k] || ''; });
+  document.getElementById('bib-f-rol').value = BIB_ROLES[r.rolAutores] ? r.rolAutores : 'autor';
+  document.getElementById('bib-f-voltipo').value = r.volTipo==='anio' ? 'anio' : 'vol';
   bibShowOrigins(origins || {});
   bibApplyType(); bibUpdatePreview();
-  box.querySelectorAll('input,textarea,select').forEach(el=>el.addEventListener('input', bibUpdatePreview));
+  box.querySelectorAll('input,textarea,select').forEach(el=>{ el.addEventListener('input', bibUpdatePreview); el.addEventListener('change', bibUpdatePreview); });
   document.getElementById('bib-f-tipo').addEventListener('change', ()=>{ bibApplyType(); bibUpdatePreview(); });
   document.getElementById('bib-save-btn').onclick = bibSaveFromForm;
   document.getElementById('bib-cancel-btn').onclick = bibCloseEditor;
@@ -9669,7 +9682,7 @@ function bibSaveFromForm(){
   if(dup && !confirm('Ya hay una referencia con el mismo DOI, o con el mismo título y año:\n\n'+bibPlain(bibFormatAPA(dup))+'\n\n¿Guardar igual?')) return;
   if(bibEditingId){
     const i = references.findIndex(x=>x.id===bibEditingId);
-    if(i>=0) references[i] = Object.assign({}, references[i], r);
+    if(i>=0){ references[i] = Object.assign({}, references[i], r); if(!r.rolAutores) delete references[i].rolAutores; if(!r.volTipo) delete references[i].volTipo; }
   } else {
     references.push(Object.assign({id: bibNewId(), inReport: true}, r));
   }
@@ -9756,7 +9769,7 @@ function bibToBibTeX(r){
   const A = bibParseAuthors(r.autores), first = A[0] ? (A[0].org || A[0].family) : (r.titulo||'ref');
   const key = bibNorm(first).split(' ')[0] + (r.anio||'sf') + (bibNorm(r.titulo).split(' ').find(w=>w.length>3) || '');
   const auth = A.map(a=>a.org ? '{'+a.org+'}' : (a.family + (a.given ? ', '+a.given : ''))).join(' and ');
-  const f = [['author', auth], ['title', r.titulo], ['year', r.anio], [r.tipo==='articulo' || r.tipo==='prensa' ? 'journal' : r.tipo==='capitulo' ? 'booktitle' : 'howpublished', r.fuente], ['volume', r.volumen], ['number', r.numero], ['pages', r.paginas ? String(r.paginas).replace(/[–—]/g,'--') : ''], ['edition', r.edicion], ['publisher', r.editorial], ['note', [r.detalle, r.tipo==='video' ? 'Video' : ''].filter(Boolean).join('. ')], [/^10\./.test(String(r.enlace||'')) ? 'doi' : 'url', r.enlace], ['keywords', (r.colecciones||[]).join(', ')]]
+  const f = [[r.rolAutores && r.rolAutores!=='autor' ? 'editor' : 'author', auth], ['title', r.titulo], ['year', r.anio], [r.tipo==='articulo' || r.tipo==='prensa' ? 'journal' : r.tipo==='capitulo' ? 'booktitle' : 'howpublished', r.fuente], ['volume', r.volumen], ['number', r.numero], ['pages', r.paginas ? String(r.paginas).replace(/[–—]/g,'--') : ''], ['edition', r.edicion], ['publisher', r.editorial], ['note', [r.detalle, r.tipo==='video' ? 'Video' : ''].filter(Boolean).join('. ')], [/^10\./.test(String(r.enlace||'')) ? 'doi' : 'url', r.enlace], ['keywords', (r.colecciones||[]).join(', ')]]
     .filter(([,v])=>v && String(v).trim()).map(([k,v])=>`  ${k} = {${String(v).trim().replace(/[{}]/g,'')}}`);
   return `@${type}{${key.replace(/[^a-z0-9]/g,'') || 'ref'+r.id},\n${f.join(',\n')}\n}`;
 }

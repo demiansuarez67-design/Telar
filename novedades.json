@@ -1,6 +1,15 @@
 {
  "versiones": [
   {
+   "version": "0.14.4",
+   "fecha": "23/10/2026",
+   "novedades": [
+    "Bibliografía: los autores se pueden marcar como compiladores, editores o coordinadores; la cita APA 7 queda «(Comp.)» o «(Comps.)», «(Ed.)», «(Coord.)».",
+    "Bibliografía: en los artículos, el campo «Volumen o año» permite el formato de las revistas que numeran por año: «Año 12, n.º 3».",
+    "Al exportar a RIS y BibTeX, los compiladores y editores se exportan como editores, como los reconocen Zotero y LaTeX."
+   ]
+  },
+  {
    "version": "0.14.3",
    "fecha": "23/10/2026",
    "novedades": [
