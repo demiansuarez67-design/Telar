@@ -604,6 +604,7 @@ tbody tr:hover{background:var(--accent-bg)}
       <p class="hint helptext" data-help-for="bib-toggle">Subí un PDF o un Word (se leen en tu computadora y no se guardan), agregá el enlace de una página web o de un video, o cargá la referencia a mano. Las referencias se pueden agrupar en colecciones por tema. La app arma la cita en APA 7 y las referencias marcadas se pueden sumar al informe. Lo que se detecta del PDF es un borrador: revisalo siempre antes de guardar.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <label class="go" style="cursor:pointer;display:inline-block">📄 Subir PDF o Word<input type="file" id="bib-pdf-input" accept=".pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none"></label> <button type="button" class="go" id="bib-link-btn">🔗 Agregar enlace (web o video)</button>
+        <label class="chk-opt" style="margin-left:4px" title="Solo se envían el DOI o el ISBN encontrados en el PDF"><input type="checkbox" id="bib-online"> Completar desde internet cuando el PDF tenga DOI o ISBN (CrossRef, Open Library)</label>
         <button type="button" class="go" id="bib-new-btn">✍ Cargar a mano</button>
         <span id="bib-msg" class="hint" style="margin:0"></span>
       </div>
@@ -682,7 +683,7 @@ tbody tr:hover{background:var(--accent-bg)}
 
 <script>
 // ===== Versión de Telar (al publicar una nueva, cambiar acá y en sw.js) =====
-const APP_VERSION = '0.14.4';
+const APP_VERSION = '0.14.5';
 const APP_CHANNEL = 'beta';
 const APP_LABEL = 'Telar ' + APP_VERSION + ' ' + APP_CHANNEL;
 // Dirección del formulario de comentarios (ej. un Formulario de Google). Vacía: se explica cómo configurarla.
@@ -9367,7 +9368,9 @@ function bibCrossrefMap(m){
 const BIB_NAME_EXCL = /universidad|facultad|instituto|departamento|conicet|centro\b|abstract|resumen|palabras|keywords|introducci[oó]n|revista|journal|issn|@|https?:|\d{3,}/i;
 const BIB_PARTICLE = /^(de|del|la|las|los|da|do|dos|van|von|di|le|der|den)$/i;
 
-function bibItemsToLines(items){
+// texto de un PDF en forma compuesta (NFC): pdf.js a veces entrega la tilde como carácter separado
+function bibItemsToLines(items){ return bibItemsToLinesRaw(items).map(l=>Object.assign(l, {text: String(l.text||'').normalize('NFC')})); }
+function bibItemsToLinesRaw(items){
   const rows = [];
   items.forEach(it=>{
     if(!it.str || !it.str.trim()) return;
@@ -9419,7 +9422,7 @@ function bibToFamilyGiven(tok){
 }
 
 // parts = {info, xmp, pages:[lines...]} -> {fields, origins, warnings, notes}
-function bibGuessFromParts(parts){
+function bibGuessBasic(parts){
   const out = {fields:{}, origins:{}, warnings:[], notes:[]};
   const set = (k,v,o)=>{ if(v){ out.fields[k]=v; out.origins[k]=o; } };
   const info = parts.info || {};
@@ -9573,8 +9576,206 @@ async function bibCollectPdfParts(pdf, maxPages){
     const tc = await page.getTextContent();
     pages.push(bibItemsToLines(tc.items));
   }
-  return {info, xmp, pages, numPages: pdf.numPages};
+  let lastPage = null; // la última página da el número impreso final (páginas del artículo)
+  if(pdf.numPages > n){ try{ const tc = await (await pdf.getPage(pdf.numPages)).getTextContent(); lastPage = bibItemsToLines(tc.items); }catch(e){} }
+  return {info, xmp, pages, lastPage, numPages: pdf.numPages};
 }
+/* ===== LECTOR DE PDF MEJORADO: "Cómo citar", encabezados de revista, ISBN, internet, OCR y registro de aciertos (inicio) ===== */
+const BIB_NUM = '(?:n(?:[úu]m(?:ero)?|ro|[º°o])?\\.?\\s*[º°]?\\s*)';
+function bibCleanSeg(s){ return String(s||'').replace(/^[\s.,;:–—-]+|[\s.,;:–—-]+$/g,'').replace(/\s+/g,' ').trim(); }
+// "Apellido, N., Apellido, N. y Apellido, N." / "Nombre Apellido y Nombre Apellido" / "Apellido, Nombre; Apellido, Nombre" → una persona por línea
+function bibParseAuthorList(s){
+  // conjunciones en minúscula y entre espacios ("E." puede ser una inicial, no la conjunción "e")
+  s = String(s||'').normalize('NFC').replace(/\s+/g,' ').replace(/\s*&\s*|\s+(?:y|e|and)\s+/g,'; ').replace(/[;,\s]+$/,'').trim();
+  if(!s) return '';
+  let pieces = [];
+  s.split(/\s*;\s*/).forEach(chunk=>{
+    if(!chunk) return;
+    const toks = chunk.split(/\s*,\s*/);
+    // "Apellido, N., Apellido2, N." → pares (apellido, iniciales o nombres)
+    if(toks.length>=2 && toks.length%2===0 && toks.every((t,i)=>i%2===1 ? /^(\p{Lu}[\p{L}'’\-]*\.?\s*)+$/u.test(t) : t.length>1)){
+      for(let i=0;i<toks.length;i+=2) pieces.push(toks[i]+', '+toks[i+1]);
+    } else if(toks.length===2 && toks[0].split(' ').length<=3 && toks[1].split(' ').length<=3) pieces.push(toks[0]+', '+toks[1]);
+    else toks.forEach(t=>pieces.push(t));
+  });
+  return pieces.map(p=>bibToFamilyGiven(p.trim())).filter(p=>p.length>1).map(p=>p.replace(/,\s*((?:\p{Lu}\.?\s*)+)$/u, (m,g)=>', '+g.trim().replace(/(\p{Lu})(?!\.)/gu,'$1.').replace(/\.(?=\p{Lu})/gu,'. '))).join('\n');
+}
+const BIB_SUP = /[¹²³⁴⁵⁶⁷⁸⁹⁰*†‡§¶]+/g;
+// autores en la primera página, debajo del título (sin los superíndices de afiliación)
+function bibPageAuthors(parts, title){
+  const lines = ((parts.pages||[])[0]||[]).map(l=>l.text.replace(BIB_SUP,'').replace(/(\p{L})\d+/gu,'$1').trim());
+  const nt = bibNorm(title||''); let end = -1;
+  lines.forEach((t,i)=>{ if(i<16 && t.length>=6 && nt && nt.includes(bibNorm(t))) end = i; });
+  // "Autor: …" / "Autora: …" (tesis y documentos)
+  for(const t of lines.slice(0, 30)){ const m = t.match(/^\s*(?:autor(?:a|es|as)?|por)\s*:\s*(.+)$/i); if(m){ const toks = bibNameTokens(m[1].replace(/^(dr|dra|lic|mg|prof)\.?\s+/i,'')); if(toks.length && toks.every(bibLooksLikeName)) return toks.map(bibToFamilyGiven).join('\n'); } }
+  if(end<0) return '';
+  for(let i=end+1; i<Math.min(lines.length, end+4); i++){ const toks = bibNameTokens(lines[i]); if(toks.length && toks.every(bibLooksLikeName)) return toks.map(bibToFamilyGiven).join('\n'); }
+  return '';
+}
+// la cita trae iniciales ("Ruiz, M."): se completan con los nombres de la primera página si coinciden apellido e inicial
+function bibUpgradeInitials(authors, parts){
+  const lines = ((parts.pages||[])[0]||[]).map(l=>String(l.text||'').replace(BIB_SUP,'').normalize('NFC'));
+  const esc_ = t=>t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return String(authors||'').split('\n').map(a=>{ const m = a.match(/^(.+?),\s*((?:\p{Lu}\.\s*)+)$/u); if(!m) return a;
+    const fam = m[1].trim(), ini = m[2].trim()[0];
+    // nombre de pila (una o dos palabras) en el mismo renglón, justo antes del apellido
+    const re = new RegExp('(\\p{Lu}[\\p{Ll}\'’\\-]+(?:[ \\t]+\\p{Lu}[\\p{Ll}\'’\\-]+)?)[ \\t]+'+esc_(fam)+'(?![\\p{L}])', 'gu');
+    for(const t of lines){ for(const g of t.matchAll(re)){ const w = g[1].split(/[ \t]+/);
+      if(w[0][0]===ini) return fam+', '+g[1];
+      if(w.length>1 && w[1][0]===ini) return fam+', '+w[1]; } }
+    return a; }).join('\n');
+}
+
+// segmento de revista: "Revista, 12(3), 45-67" / "Revista, Año 12, n.º 3, pp. 45-67" / "Revista, vol. 12, núm. 3, pp. 45-67"
+function bibParseJournalSeg(s){
+  s = String(s||'').trim(); let m;
+  const pg = t=>{ const p = String(t||'').match(/pp?\.?\s*(\d+)\s*[-–]\s*(\d+)/i) || String(t||'').match(/^\s*[,:]?\s*(\d+)\s*[-–]\s*(\d+)/); return p ? p[1]+'-'+p[2] : ''; };
+  if((m = s.match(/^(.+?)[,.]\s*(?:vol(?:umen)?\.?\s*)?(\d+)\s*\(\s*([\w\-\/]+)\s*\)\s*(.*)$/i)) && !/a[ñn]o\s*$/i.test(m[1])) return {fuente: bibCleanSeg(m[1]), volumen: m[2], numero: m[3], paginas: pg(m[4])};
+  if((m = s.match(new RegExp('^(.+?)[,.]\\s*a[ñn]o\\s*(\\d+|[IVXLC]+)\\s*[,.]\\s*'+BIB_NUM+'(\\d+)(.*)$','i')))) return {fuente: bibCleanSeg(m[1]), volumen: m[2], numero: m[3], volTipo:'anio', paginas: pg(m[4])};
+  if((m = s.match(new RegExp('^(.+?)[,.]\\s*vol(?:umen)?\\.?\\s*(\\d+)\\s*[,.]?\\s*'+BIB_NUM+'(\\d+)(.*)$','i')))) return {fuente: bibCleanSeg(m[1]), volumen: m[2], numero: m[3], paginas: pg(m[4])};
+  if((m = s.match(/^(.+?),\s*(\d+)\s*,\s*(\d+)\s*[-–]\s*(\d+)/))) return {fuente: bibCleanSeg(m[1]), volumen: m[2], paginas: m[3]+'-'+m[4]};
+  return null;
+}
+// una cita completa (APA y variantes): autores (año). Título. Revista/Libro/En…
+function bibParseCitation(c){
+  const out = {}; c = String(c||'').replace(/\s+/g,' ').trim();
+  const yM = c.match(/\(\s*((?:19|20)\d{2})[a-z]?\s*(?:,[^)]*)?\)/) || c.match(/[.,]\s*((?:19|20)\d{2})[a-z]?\s*[.,]/);
+  if(!yM) return out;
+  out.anio = yM[1];
+  let authorsPart = c.slice(0, yM.index).trim().replace(/[.,;:\s]+$/,'');
+  let rest = c.slice(yM.index + yM[0].length).trim().replace(/^[.,:]\s*/,'');
+  const roleM = authorsPart.match(/\(\s*(comps?|coords?|eds?|compiladora?e?s?|coordinadora?e?s?|editora?e?s?)\.?\s*\)\s*$/i);
+  if(roleM){ out.rolAutores = /comp/i.test(roleM[1]) ? 'comp' : /coord/i.test(roleM[1]) ? 'coord' : 'ed'; authorsPart = authorsPart.slice(0, roleM.index).trim().replace(/[.,]+$/,''); }
+  if(authorsPart) out.autores = bibParseAuthorList(authorsPart);
+  let title, after; const tM = rest.match(/^[«“"']([^»”"']{4,})[»”"']\s*[.,]?\s*/);
+  if(tM){ title = tM[1]; after = rest.slice(tM[0].length); }
+  else { const i = rest.search(/[.?!]\s+(?=(?:En|In)\b|[\p{Lu}«“"])/u); if(i<0){ title = rest; after = ''; } else { title = rest.slice(0, i+1).replace(/\.$/,''); after = rest.slice(i+1).trim(); } }
+  out.titulo = bibCleanSeg(title).replace(/\s*\[[^\]]*\]$/,'');
+  const dM = after.match(/(?:https?:\/\/(?:dx\.)?doi\.org\/|doi:\s*)(10\.\d{4,9}\/\S+)/i);
+  if(dM) out.enlace = 'https://doi.org/'+dM[1].replace(/[.,;)]+$/,''); else { const uM = after.match(/https?:\/\/\S+/); if(uM) out.enlace = uM[0].replace(/[.,;)]+$/,''); }
+  const a2 = after.replace(/(?:https?:\/\/|doi:\s*)\S+/gi,'').replace(/\s*(?:Recuperado|Disponible)\s.*$/i,'').trim();
+  const enM = a2.match(/^(?:En|In)\s*:?\s*(.+?)\s*\(\s*(comps?|coords?|eds?|compiladora?e?s?|editora?e?s?)\.?\s*\)\s*[,.:]?\s*(.+)$/i);
+  if(enM){ out.tipo = 'capitulo'; out.editores = bibParseAuthorList(enM[1]); let book = enM[3];
+    const pp = book.match(/\(?\s*pp?\.\s*(\d+)\s*[-–]\s*(\d+)\s*\)?/i); if(pp){ out.paginas = pp[1]+'-'+pp[2]; book = book.replace(pp[0],' '); }
+    const segs = book.split(/\.\s+/); out.fuente = bibCleanSeg(segs[0]);
+    const ed = bibCleanSeg(segs.slice(1).join('. ').replace(/^[^:]{2,40}:\s*/,'')); if(ed && ed.length<90) out.editorial = ed; return out; }
+  const art = bibParseJournalSeg(a2);
+  if(art && art.fuente && art.fuente.length<=120){ Object.assign(out, art, {tipo:'articulo'}); return out; }
+  const ed = bibCleanSeg(a2.replace(/^[^:]{2,40}:\s*/,'')); if(ed && ed.length<90 && !/\d{2,}/.test(ed)){ out.tipo = 'libro'; out.editorial = ed; }
+  return out;
+}
+// bloque "Cómo citar este artículo" y variantes
+function bibHowToCite(allText){
+  const re = /(c[oó]mo\s+citar(?:\s+este\s+(?:art[ií]culo|documento|cap[ií]tulo|trabajo|texto))?|para\s+citar(?:\s+este\s+(?:art[ií]culo|documento|cap[ií]tulo|trabajo|texto))?|citaci[oó]n\s+sugerida|cita\s+sugerida|forma\s+de\s+citar|referencia\s+(?:sugerida|para\s+citar)|cita\s+recomendada|how\s+to\s+cite(?:\s+this\s+(?:article|paper))?)\s*[:.]?\s*/i;
+  const m = String(allText||'').match(re); if(!m) return '';
+  const lines = allText.slice(m.index + m[0].length).split('\n'), out = [];
+  for(const l of lines){ const t = l.trim();
+    if(!t){ if(out.length) break; else continue; }
+    if(/^(resumen|abstract|palabras\s+clave|keywords|recibido|received|introducci[oó]n|resumo)\b/i.test(t)) break;
+    out.push(t); if(out.join(' ').length > 700) break;
+    if(/(https?:\/\/\S+|doi\.org\/\S+)\s*\.?$/.test(t)) break; }
+  return out.join(' ').replace(/(\p{Ll})-\s+(\p{Ll})/gu,'$1$2').replace(/\s+/g,' ').trim();
+}
+// encabezados y pies de revista, ISSN y páginas impresas
+function bibJournalFromLines(parts){
+  const res = {}, pages = parts.pages || [], all = pages.concat(parts.lastPage ? [parts.lastPage] : []);
+  const lines = all.flat().map(l=>l.text.trim().replace(/\bN\s*[*°º]\s*(?=\d)/g,'N° ')).filter(Boolean);
+  const issnI = lines.findIndex(t=>/\b(?:e-?|p-?)?ISSN\b/i.test(t));
+  const VOL = new RegExp('^(.*?)(?:[,|·:]|\\s[-–—]\\s)?\\s*\\b(a[ñn]o|vol(?:umen)?\\.?)\\s*(\\d+|[IVXLC]+)\\s*[,.]?\\s*'+BIB_NUM+'(\\d+)','i');
+  for(const t of lines){ const m = t.match(VOL); if(!m) continue;
+    res.volumen = m[3]; res.numero = m[4]; if(/a[ñn]o/i.test(m[2])) res.volTipo = 'anio';
+    const name = bibCleanSeg(m[1].replace(/\bISSN.*$/i,'')); if(name.length>=4 && name.length<=90 && !/^\d/.test(name) && /\p{L}{3}/u.test(name)) res.fuente = name;
+    const pp = t.match(/pp?\.?\s*(\d+)\s*[-–]\s*(\d+)/i); if(pp) res.paginas = pp[1]+'-'+pp[2];
+    break; }
+  if(!res.volumen){ for(const t of lines){ if(!/,\s*\d+\s*\(\s*\d+\s*\)/.test(t) || t.length>120) continue; const j = bibParseJournalSeg(t); if(j && j.fuente && j.fuente.length<=90 && /\p{L}{3}/u.test(j.fuente)){ Object.assign(res, j); break; } } }
+  if(!res.fuente){ const rv = lines.find(t=>/^revista\b/i.test(t) && t.length<=90 && !/\d{4}-\d{3}/.test(t)); if(rv) res.fuente = bibCleanSeg(rv.split(/[,|·]/)[0]); }
+  if(!res.fuente && issnI>0){ const prev = lines[issnI-1]; if(prev && prev.length<=90 && !/\d/.test(prev)) res.fuente = bibCleanSeg(prev); }
+  if(!res.paginas){ // numeración impresa: primera y última página
+    const num = ls=>{ const c = (ls||[]).map(l=>l.text.trim()).filter(t=>/^\d{1,4}$/.test(t)).map(Number); return c.length ? c : null; };
+    const a = num(pages[0]), b = num(parts.lastPage);
+    if(a && b && parts.numPages>1){ const first = Math.min(...a), last = Math.max(...b); if(last-first===parts.numPages-1) res.paginas = first+'-'+last; } }
+  if(issnI>=0) res.issn = (lines[issnI].match(/\d{4}-\d{3}[\dX]/i)||[])[0] || '';
+  return res;
+}
+function bibIsbn(allText){ const m = String(allText||'').match(/ISBN(?:[-‐ ]?1[03])?\s*:?\s*((?:97[89][-‐\s]?)?(?:\d[-‐\s]?){9}[\dXx])/i); return m ? m[1].replace(/[^\dXx]/g,'') : ''; }
+// combina el resultado básico con lo que se encuentra en "Cómo citar", encabezados e ISBN
+function bibGuessFromParts(parts){
+  const out = bibGuessBasic(parts);
+  const all = (parts.pages||[]).concat(parts.lastPage ? [parts.lastPage] : []).map(p=>p.map(l=>l.text).join('\n')).join('\n');
+  const set = (k,v,o,force)=>{ if(!v) return; if(force || !out.fields[k]){ out.fields[k] = v; out.origins[k] = o; } };
+  const cit = bibHowToCite(all);
+  if(cit){ const c = bibParseCitation(cit);
+    if(c.titulo && c.anio){ ['titulo','autores','anio','fuente','volumen','numero','paginas','editores','editorial','enlace'].forEach(k=>set(k, c[k], 'bloque «Cómo citar» del PDF', true));
+      if(c.tipo) set('tipo', c.tipo, 'bloque «Cómo citar» del PDF', true); if(c.rolAutores) out.fields.rolAutores = c.rolAutores; if(c.volTipo) out.fields.volTipo = c.volTipo;
+      if(out.fields.autores && /,\s*(\p{Lu}\.\s*)+$/mu.test(out.fields.autores)){ const up = bibUpgradeInitials(out.fields.autores, parts); if(up!==out.fields.autores){ out.fields.autores = up; out.origins.autores = 'bloque «Cómo citar» (nombres completos de la primera página)'; } }
+      out.notes.push('Se usó la cita sugerida por el propio PDF («Cómo citar»).'); } }
+  if(!(cit && out.origins.autores && /citar/.test(out.origins.autores))){
+    const pa = bibPageAuthors(parts, out.fields.titulo);
+    const cur = String(out.fields.autores||'').split('\n').filter(Boolean);
+    if(pa && (!cur.length || (/metadatos/.test(out.origins.autores||'') && pa.split('\n').length > cur.length && cur.every(c=>bibNorm(pa).includes(bibNorm(c.split(',')[0])))))){ out.fields.autores = pa; out.origins.autores = 'texto de la primera página — verificar el orden Apellido, Nombre'; }
+  }
+  { const p1 = ((parts.pages||[])[0]||[]).map(l=>l.text); const th = p1.find(t=>/^\s*tesis\s+(?:de|para\s+optar|doctoral|de\s+maestr)/i.test(t));
+    if(th && out.fields.tipo!=='articulo'){ set('tipo', 'tesis', 'portada de tesis', true); set('detalle', bibCleanSeg(th), 'portada'); } }
+  const j = bibJournalFromLines(parts);
+  // control cruzado: si la cita y el encabezado de la revista dicen cosas distintas, el campo queda marcado para revisar
+  ['volumen','numero','paginas'].forEach(k=>{ if(j[k] && out.fields[k] && /citar/.test(out.origins[k]||'') && bibNorm(j[k])!==bibNorm(out.fields[k])){ out.origins[k] += ` — el encabezado de la revista dice «${j[k]}»: verificar`; out.warnings.push(`El dato «${k==='paginas' ? 'páginas' : k==='numero' ? 'número' : 'volumen'}» no coincide entre la cita y el encabezado de la revista: revisalo.`); } });
+  if(j.volumen || j.fuente){
+    ['fuente','volumen','numero','paginas'].forEach(k=>set(k, j[k], 'encabezado o pie de página de la revista'));
+    if(j.volTipo && !out.fields.volTipo && out.origins.volumen==='encabezado o pie de página de la revista') out.fields.volTipo = j.volTipo;
+    if(!out.fields.tipo || /suposici|supuso|verificar/.test(out.origins.tipo||'')) { if(j.volumen) set('tipo', 'articulo', 'tiene volumen o año y número de revista', true); } }
+  const isbn = bibIsbn(all);
+  if(isbn){ out.isbn = isbn;
+    if(!(j.volumen) && !(out.fields.tipo==='articulo' && out.origins.tipo && /citar/.test(out.origins.tipo)) && out.fields.tipo!=='capitulo') set('tipo', 'libro', 'tiene ISBN', true);
+    const p1 = ((parts.pages||[])[0]||[]).map(l=>l.text);
+    const comp = out.fields.tipo==='libro' ? p1.find(t=>t.length<=90 && !/^\s*(en|in)\b/i.test(t) && /\((?:comps?|compiladora?e?s?|coords?|coordinadora?e?s?|eds?|editora?e?s?)\.?\)|\b(?:compiladora?e?s?|coordinadora?e?s?)\b/i.test(t)) : null;
+    if(comp && !out.fields.rolAutores){ out.fields.rolAutores = /coord/i.test(comp) ? 'coord' : /comp/i.test(comp) ? 'comp' : 'ed';
+      const names = comp.replace(/\(.*?\)|\b(?:compiladora?e?s?|coordinadora?e?s?|editora?e?s?)\b|[:]/gi,' ');
+      const al = bibParseAuthorList(names); if(al) set('autores', al, 'portada (compiladores)', true); }
+    const ed = p1.find(t=>/\b(editorial|ediciones|libros|clacso|eudeba|prometeo|siglo\s+xxi|biblos|teseo|edulp|eduvim|edunsa|universidad)\b/i.test(t) && t.length<=60 && !/^\s*(isbn|issn)/i.test(t));
+    if(ed && out.fields.tipo==='libro') set('editorial', bibCleanSeg(ed), 'portada'); }
+  if(j.issn) out.issn = j.issn;
+  return out;
+}
+// renglones de un PDF escaneado, leídos con OCR (primera página)
+async function bibOcrFirstPage(pdf){
+  const page = await pdf.getPage(1), vp = page.getViewport({scale: 2.2});
+  const cv = document.createElement('canvas'); cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+  await page.render({canvasContext: cv.getContext('2d'), viewport: vp}).promise;
+  const res = await ocrRecognizeZones(cv, [{x:0, y:0, w: cv.width, h: cv.height}], {auto:true, enhance:true});
+  const lines = []; (res[0] ? res[0].paras : []).forEach(p=>{ p.forEach(line=>lines.push({y:0, size:0, text: line.map(w=>w.t).join(' ')})); lines.push({y:0, size:0, text:''}); });
+  return lines.filter((l,i,a)=>l.text || (a[i-1] && a[i-1].text));
+}
+// para los PDF leídos por OCR, sin tamaños de letra: el título es el primer renglón largo que no es encabezado
+function bibOcrTitle(lines){ const noise = /^(revista|vol\.|volumen|a[ñn]o\s+\d|issn|doi|https?:|www\.|universidad|facultad|resumen|abstract|para\s+citar|c[oó]mo\s+citar|\d+$)/i;
+  const journal = /\b(vol(?:umen)?\.?|a[ñn]o|n\s*[º°*]|n[úu]m(?:ero)?\.?)\s*\d|\bissn\b|\bpp\.\s*\d/i;
+  const t = lines.map(l=>l.text.trim()).filter(Boolean).find(t=>t.split(/\s+/).length>=3 && !noise.test(t) && !journal.test(t) && !/@/.test(t)); return t || ''; }
+// completar desde internet (solo si se activó): CrossRef por DOI, Open Library por ISBN
+async function bibOpenLibrary(isbn){
+  const ctrl = new AbortController(), timer = setTimeout(()=>ctrl.abort(), 12000);
+  try{ const r = await fetch('https://openlibrary.org/api/books?bibkeys=ISBN:'+isbn+'&format=json&jscmd=data', {signal: ctrl.signal}); const j = await r.json(), b = j['ISBN:'+isbn]; if(!b) throw new Error('Open Library no encontró ese ISBN');
+    return {tipo:'libro', titulo: [b.title, b.subtitle].filter(Boolean).join(': '), autores: (b.authors||[]).map(a=>bibToFamilyGiven(a.name)).join('\n'), editorial: (b.publishers||[]).map(p=>p.name)[0]||'', anio: ((b.publish_date||'').match(/\d{4}/)||[''])[0]};
+  } finally { clearTimeout(timer); } }
+// registro de aciertos: qué propuso el lector y qué se guardó finalmente
+let bibPdfProposal = null;
+const BIB_STAT_FIELDS = ['tipo','autores','anio','titulo','fuente','volumen','numero','paginas','editorial','enlace'];
+function bibRecordPdfOutcome(saved){
+  if(!bibPdfProposal) return; const p = bibPdfProposal; bibPdfProposal = null;
+  const st = project.bibPdfStats = project.bibPdfStats || {n:0, fields:{}}; st.n++;
+  BIB_STAT_FIELDS.forEach(k=>{ const prop = String(p.fields[k]||'').trim(), fin = String(saved[k]||'').trim(); if(!prop && !fin) return;
+    const f = st.fields[k] = st.fields[k] || {propuesto:0, aceptado:0, faltante:0};
+    if(prop){ f.propuesto++; if(bibNorm(prop)===bibNorm(fin)) f.aceptado++; } else if(fin) f.faltante++; });
+}
+function bibPdfStatsHtml(){
+  const st = project.bibPdfStats; if(!st || !st.n) return '';
+  const LBL = {tipo:'Tipo', autores:'Autores', anio:'Año', titulo:'Título', fuente:'Revista o libro', volumen:'Volumen o año', numero:'Número', paginas:'Páginas', editorial:'Editorial', enlace:'DOI o enlace'};
+  const rows = BIB_STAT_FIELDS.filter(k=>st.fields[k]).map(k=>{ const f = st.fields[k], tot = f.propuesto + f.faltante;
+    return `<tr><td>${LBL[k]}</td><td>${f.propuesto ? Math.round(100*f.aceptado/f.propuesto)+'%' : '—'}</td><td>${tot ? Math.round(100*f.propuesto/tot)+'%' : '—'}</td></tr>`; }).join('');
+  return `<details style="margin-top:12px"><summary style="cursor:pointer;font-size:.88rem"><strong>Cómo viene funcionando el lector de PDF</strong> con tus archivos (${st.n} ${st.n===1 ? 'PDF' : 'PDF'})</summary>
+    <div class="tablewrap" style="margin-top:6px"><table><thead><tr><th>Campo</th><th>Lo propuesto quedó igual</th><th>Se propuso algo</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="hint">"Lo propuesto quedó igual": de los datos que el lector propuso, cuántos guardaste sin cambios. "Se propuso algo": en cuántos casos encontró ese dato. Se calcula solo, cada vez que guardás una referencia leída de un PDF.</p></details>`;
+}
+/* ===== LECTOR DE PDF MEJORADO (fin) ===== */
+
 async function bibFetchCrossref(doi){
   const clean = String(doi).trim().replace(/^https?:\/\/(dx\.)?doi\.org\//i,'').replace(/^doi:\s*/i,'');
   const ctrl = new AbortController();
@@ -9652,6 +9853,7 @@ function bibShowOrigins(origins){
   });
 }
 function bibCloseEditor(){
+  bibPdfProposal = null;
   bibEditingId = null;
   const box = document.getElementById('bib-editor');
   box.style.display = 'none'; box.innerHTML = '';
@@ -9678,6 +9880,7 @@ function bibOpenEditor(ref, origins){
 function bibSaveFromForm(){
   const r = bibReadForm();
   if(!r.titulo){ alert('Falta el título: es el único dato imprescindible.'); return; }
+  try{ bibRecordPdfOutcome(r); }catch(e){}
   const dup = references.find(x=> x.id!==bibEditingId && ((r.enlace && x.enlace && bibNorm(x.enlace)===bibNorm(r.enlace)) || (bibNorm(x.titulo)===bibNorm(r.titulo) && String(x.anio||'')===String(r.anio||''))));
   if(dup && !confirm('Ya hay una referencia con el mismo DOI, o con el mismo título y año:\n\n'+bibPlain(bibFormatAPA(dup))+'\n\n¿Guardar igual?')) return;
   if(bibEditingId){
@@ -9889,6 +10092,7 @@ function renderBibliography(){
   updateMainTabCounts();
   const wrap = document.getElementById('bib-list'); if(!wrap) return;
   const bar = document.getElementById('bib-list-bar');
+  const onl = document.getElementById('bib-online'); if(onl) onl.checked = !!project.bibOnline;
   const all = bibSorted(references), cols = bibCollections();
   if(bibColFilter && bibColFilter!=='__none__' && !cols.includes(bibColFilter)) bibColFilter = '';
   const list = bibVisible();
@@ -9905,7 +10109,7 @@ function renderBibliography(){
     <button type="button" class="mini-export" data-bib-bar="colmgr" style="font-size:.8rem;padding:6px 10px">🗂 Colecciones…</button>
     <button type="button" class="mini-export" data-bib-bar="markall" style="font-size:.8rem;padding:6px 10px">Marcar las visibles</button>
     <button type="button" class="mini-export" data-bib-bar="marknone" style="font-size:.8rem;padding:6px 10px">Desmarcar todas</button>
-  </div><p class="hint" style="margin:0 0 6px">La casilla de cada referencia define cuáles entran al informe y a la copia; al exportar se elige entre todas, las marcadas o una colección.${bibColFilter ? ` Se muestran ${list.length} de ${all.length}.` : ''}</p>`;
+  </div><p class="hint" style="margin:0 0 6px">La casilla de cada referencia define cuáles entran al informe y a la copia; al exportar se elige entre todas, las marcadas o una colección.${bibColFilter ? ` Se muestran ${list.length} de ${all.length}.` : ''}</p>${bibPdfStatsHtml()}`;
   wrap.innerHTML = list.map(r=>`<div class="bib-item" style="padding:10px 0;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-start">
     <input type="checkbox" data-bib-inc="${r.id}" ${r.inReport?'checked':''} title="Incluir en el informe" style="margin-top:4px">
     <div style="flex:1;min-width:0">
@@ -9935,8 +10139,24 @@ async function bibHandlePdf(file){
     const buf = await readFileAs(file, 'buffer');
     const pdf = await lib.getDocument({data: new Uint8Array(buf), isEvalSupported: false}).promise;
     const parts = await bibCollectPdfParts(pdf, 2);
+    let ocrUsed = false;
+    const hasText = (parts.pages||[]).some(p=>p.some(l=>l.text.trim().length>2));
+    if(!hasText && ocrAvailable()){ // escaneo sin texto: se lee la primera página con OCR
+      msg.textContent = 'El PDF no tiene texto: leyendo la primera página con OCR…';
+      try{ parts.pages = [await bibOcrFirstPage(pdf)]; ocrUsed = true; }catch(e){}
+    }
     try{ pdf.destroy(); }catch(e){}
     const g = bibGuessFromParts(parts);
+    if(ocrUsed){ g.warnings = g.warnings.filter(w=>!/no tiene texto legible/.test(w)); g.notes.push('El PDF es un escaneo: el texto se leyó con OCR y puede tener errores.');
+      if(!/citar/.test(g.origins.titulo||'')){ const t = bibOcrTitle(parts.pages[0]); if(t){ g.fields.titulo = t; g.origins.titulo = 'primera línea larga (OCR) — verificar'; } } }
+    if(project.bibOnline){ // completar desde internet, solo si se activó
+      const doi = String(g.fields.enlace||'').match(/10\.\d{4,9}\/\S+/);
+      try{
+        if(doi){ msg.textContent = 'Consultando CrossRef…'; const f = await bibFetchCrossref(doi[0]); Object.keys(f).forEach(k=>{ if(f[k]){ g.fields[k] = f[k]; g.origins[k] = 'CrossRef (por el DOI del PDF)'; } }); g.notes.push('Datos completados con CrossRef a partir del DOI.'); }
+        else if(g.isbn){ msg.textContent = 'Consultando Open Library…'; const f = await bibOpenLibrary(g.isbn); Object.keys(f).forEach(k=>{ if(f[k]){ g.fields[k] = f[k]; g.origins[k] = 'Open Library (por el ISBN del PDF)'; } }); g.notes.push('Datos completados con Open Library a partir del ISBN.'); }
+      }catch(e){ g.notes.push('No se pudo completar desde internet ('+(e && e.message ? e.message : e)+'); quedan los datos leídos del PDF.'); }
+    }
+    bibPdfProposal = {fields: Object.assign({}, g.fields)};
     bibOpenEditor(Object.assign({tipo:'informe'}, g.fields), g.origins);
     const notes = [].concat(g.warnings, g.notes);
     msg.textContent = notes.length ? notes.join(' ') : 'Listo: revisá los datos detectados antes de guardar. El PDF no se guarda.';
@@ -9952,6 +10172,7 @@ document.getElementById('bib-pdf-input').addEventListener('change', e=>{
   if(f) (/\.docx$/i.test(f.name) ? bibHandleWord(f) : bibHandlePdf(f));
 });
 document.getElementById('bib-link-btn').addEventListener('click', openBibLinkDialog);
+document.getElementById('bib-online').addEventListener('change', e=>{ project.bibOnline = e.target.checked; persistSession(); });
 document.getElementById('bib-list').addEventListener('click', async e=>{
   const btn = e.target.closest('[data-bib-act]'); if(!btn) return;
   const r = references.find(x=>x.id===btn.dataset.id); if(!r) return;

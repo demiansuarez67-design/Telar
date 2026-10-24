@@ -1,6 +1,18 @@
 {
  "versiones": [
   {
+   "version": "0.14.5",
+   "fecha": "23/10/2026",
+   "novedades": [
+    "Lector de PDF mejorado: usa el bloque «Cómo citar este artículo» de las revistas, con nombres completos tomados de la primera página.",
+    "Lector de PDF: lee el nombre de la revista, el volumen o año, el número y las páginas de los encabezados y pies de página.",
+    "Lector de PDF: reconoce libros por el ISBN, capítulos («En: … (Comp.)») y compiladores o coordinadores.",
+    "Lector de PDF: los PDF escaneados se leen con OCR; si un dato no coincide entre la cita y el encabezado, queda marcado para revisar.",
+    "Opción para completar desde internet cuando el PDF tiene DOI (CrossRef) o ISBN (Open Library).",
+    "La bibliografía muestra cómo viene funcionando el lector con tus propios PDF."
+   ]
+  },
+  {
    "version": "0.14.4",
    "fecha": "23/10/2026",
    "novedades": [
