@@ -1,6 +1,14 @@
 {
  "versiones": [
   {
+   "version": "0.14.8",
+   "fecha": "28/10/2026",
+   "novedades": [
+    "Temporalidades, por año: días con al menos un conflicto en curso, porcentaje del año, promedio de conflictos simultáneos por día y máximo simultáneo (además de los días de conflicto).",
+    "Temporalidades: opción para dar por cerrado un conflicto cuando la base vinculada (por ejemplo, intervenciones estatales) registra una resolución elegida, como un acta acuerdo."
+   ]
+  },
+  {
    "version": "0.14.7",
    "fecha": "28/10/2026",
    "novedades": [
