@@ -702,7 +702,7 @@ tbody tr:hover{background:var(--accent-bg)}
 
 <script>
 // ===== Versión de Telar (al publicar una nueva, cambiar acá y en sw.js) =====
-const APP_VERSION = '0.14.6';
+const APP_VERSION = '0.14.7';
 const APP_CHANNEL = 'beta';
 const APP_LABEL = 'Telar ' + APP_VERSION + ' ' + APP_CHANNEL;
 // Dirección del formulario de comentarios (ej. un Formulario de Google). Vacía: se explica cómo configurarla.
@@ -6860,6 +6860,11 @@ function detectLabel(columns, filename){
   return {key, label: base};
 }
 // Crea una base a partir de filas leídas, propone el esquema y abre el asistente si hay columnas nuevas
+// cuando cambian las bases (se carga, se restaura o se quita una) o la base activa, el análisis abierto se vuelve a dibujar
+function refreshOpenAnalysis(){ clearTimeout(refreshOpenAnalysis.t); refreshOpenAnalysis.t = setTimeout(()=>{ try{
+  const vis = id=>{ const el = document.getElementById(id); return el && el.style.display==='block'; };
+  if(!datasets[active]) return;
+  if(vis('tempo-view')) renderTempo(); else if(vis('conf-view')) renderConf(); else if(vis('net-view')) renderNet(); }catch(e){} }, 60); }
 function registerDataset(key, label, rows, allCols, sourceFile, codebook, hints){
   if(datasets[key]) dropStatusFor(key);
   const ds = {rows, allCols, columns: [], dateCol: null, label, sourceFile, splitCols: new Set()};
@@ -6890,6 +6895,7 @@ function registerDataset(key, label, rows, allCols, sourceFile, codebook, hints)
   applySchema(ds);
   logEvent('carga', `Se cargó «${sourceFile}» como base «${label}»: ${rows.length} registros, ${allCols.length} columnas.` + (allKnown ? ' Tipos de columna aplicados desde la configuración del proyecto: '+schemaSummary(ds)+'.' : ''));
   if(!allKnown) enqueueWizard(key);
+  refreshOpenAnalysis();
   return ds;
 }
 // Bases que arma la propia app (cuadros de Word): tipos fijos, sin asistente
@@ -6971,6 +6977,7 @@ document.querySelectorAll('.main-tab').forEach(t=>{
 });
 function updateMainTabCounts(){
   try{ renderWordsUI(); renderMindUI(); ensureModulesForContent(); }catch(e){}
+  refreshOpenAnalysis();
   const nQ = Object.keys(qualDocs).length, nI = Object.keys(interviews).length, nM = Object.values(datasets).filter(isCodingMatrix).length;
   document.getElementById('tab-count-entrevistas').textContent = nI ? '('+nI+')' : '';
   document.getElementById('tab-count-codigos').textContent = nM ? '('+nM+')' : '';
@@ -7034,6 +7041,7 @@ function removeDataset(key, statusEl){
   }
   renderContextUI();
   persistSession();
+  refreshOpenAnalysis();
 }
 
 const qualDocs = {}; // key -> {label, year, entries:[{mes,dia,texto}]}
@@ -7855,6 +7863,7 @@ function buildUI(){
   renderAll();
   renderContextUI();
   persistSession();
+  refreshOpenAnalysis();
 }
 
 document.querySelectorAll('#explore .mode-btn').forEach(b=>{ // solo los modos de la solapa Gráficos

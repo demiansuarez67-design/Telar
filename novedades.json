@@ -1,6 +1,13 @@
 {
  "versiones": [
   {
+   "version": "0.14.7",
+   "fecha": "28/10/2026",
+   "novedades": [
+    "Corrección: con Temporalidades, Indicadores o la Red de actores abiertos, al cargar, restaurar o quitar una base (o cambiar la base activa) el análisis se actualiza. Antes, «Vincular con otra base» podía mostrar solo «ninguna» aunque hubiera dos bases cargadas."
+   ]
+  },
+  {
    "version": "0.14.6",
    "fecha": "28/10/2026",
    "novedades": [
