@@ -1,6 +1,16 @@
 {
  "versiones": [
   {
+   "version": "0.14.6",
+   "fecha": "28/10/2026",
+   "novedades": [
+    "Temporalidades (en «Más análisis»): arma los conflictos a partir de los registros y calcula inicio, fin, duración y días de conflicto por año.",
+    "Los conflictos sin final conocido se tratan como datos censurados: duración mínima («≥») y curva de Kaplan-Meier con la duración mediana.",
+    "Todo es editable: nombre, fecha de fin, estado y unión de conflictos; con filtros por año, estado, duración y nombre.",
+    "Se puede vincular con la base de intervenciones estatales: cuántas intervenciones tuvo cada conflicto y a los cuántos días llegó la primera."
+   ]
+  },
+  {
    "version": "0.14.5",
    "fecha": "23/10/2026",
    "novedades": [

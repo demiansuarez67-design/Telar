@@ -266,8 +266,8 @@ tbody tr:hover{background:var(--accent-bg)}
       <button class="mode-btn" data-mode="cross">Tabla cruzada</button>
       <button class="mode-btn" data-mode="quality">Calidad de datos</button>
       <button class="mode-btn" data-mode="net">Red de actores</button>
-      <select id="mode-more" class="mode-more" aria-label="Más análisis"><option value="">Más análisis</option><option value="timeline">Línea de tiempo</option><option value="cmp">Comparar grupos</option><option value="reg">Regresión</option><option value="conf">Indicadores</option></select>
-      <span class="mode-in-menu"><button class="mode-btn" data-mode="timeline">Línea de tiempo</button><button class="mode-btn" data-mode="cmp">Comparar grupos</button><button class="mode-btn" data-mode="reg">Regresión</button><button class="mode-btn" data-mode="conf">Indicadores</button></span>
+      <select id="mode-more" class="mode-more" aria-label="Más análisis"><option value="">Más análisis</option><option value="timeline">Línea de tiempo</option><option value="cmp">Comparar grupos</option><option value="reg">Regresión</option><option value="conf">Indicadores</option><option value="tempo">Temporalidades</option></select>
+      <span class="mode-in-menu"><button class="mode-btn" data-mode="timeline">Línea de tiempo</button><button class="mode-btn" data-mode="cmp">Comparar grupos</button><button class="mode-btn" data-mode="reg">Regresión</button><button class="mode-btn" data-mode="conf">Indicadores</button><button class="mode-btn" data-mode="tempo">Temporalidades</button></span>
       </div>
       <div class="modebar-opts">
       <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;color:var(--sub);cursor:pointer">
@@ -391,6 +391,25 @@ tbody tr:hover{background:var(--accent-bg)}
         <p class="hint" style="margin:4px 0 0">Valores habituales: 1,5 desvíos; 2 períodos; la mediana. Los criterios se guardan con el proyecto y quedan en el anexo metodológico.</p>
       </details>
       <div id="conf-out"></div>
+    </div>
+
+    <div id="tempo-view" style="display:none">
+      <p class="hint helptext">Arma los conflictos a partir de los registros (por una columna que los identifica o por una combinación de columnas) y calcula su inicio, su fin, su duración y cuántos días ocupa cada uno en cada año. Los conflictos sin final conocido se tratan como datos censurados. Todo es editable: nombres, fechas de fin, estados y uniones.</p>
+      <div class="adv-controls">
+        <div class="field"><label>Cada conflicto se identifica por</label><select id="tp-mode"></select></div>
+        <div class="field"><label>Separar si pasan más de … días sin registros</label><input type="number" id="tp-gap" min="1" style="width:90px"></div>
+        <div class="field"><label>Fin estimado si no hay registros por … días</label><input type="number" id="tp-est" min="1" style="width:90px"></div>
+        <div class="field"><label>Fin del período observado</label><input type="date" id="tp-obsend" title="Vacío: la última fecha de la base"></div>
+      </div>
+      <div id="tp-keycols" style="display:none;gap:6px 14px;flex-wrap:wrap;margin:2px 0 8px"></div>
+      <div class="adv-controls">
+        <div class="field"><label>Cierre del conflicto</label><select id="tp-closecol"></select></div>
+        <div class="field"><label>Vincular con otra base (por ejemplo, intervenciones)</label><select id="tp-linkds"></select></div>
+        <div class="field"><label>Columna de esa base</label><select id="tp-linkcol"></select></div>
+        <label class="chk-opt" style="align-self:flex-end"><input type="checkbox" id="tp-estopen"> Tratar los finales estimados como desconocidos</label>
+      </div>
+      <div id="tp-closevals" style="display:none;gap:6px 14px;flex-wrap:wrap;margin:2px 0 8px"></div>
+      <div id="tp-out"></div>
     </div>
 
     <div id="net-view" style="display:none">
@@ -683,7 +702,7 @@ tbody tr:hover{background:var(--accent-bg)}
 
 <script>
 // ===== Versión de Telar (al publicar una nueva, cambiar acá y en sw.js) =====
-const APP_VERSION = '0.14.5';
+const APP_VERSION = '0.14.6';
 const APP_CHANNEL = 'beta';
 const APP_LABEL = 'Telar ' + APP_VERSION + ' ' + APP_CHANNEL;
 // Dirección del formulario de comentarios (ej. un Formulario de Google). Vacía: se explica cómo configurarla.
@@ -936,7 +955,7 @@ document.getElementById('ext-btn').addEventListener('click', openExtractDialog);
 ['chk-marks','chk-marks-only'].forEach(id=>document.getElementById(id).addEventListener('change', renderTable));
 document.getElementById('marks-xlsx').addEventListener('click', exportMarks);
 // "Más análisis": los modos de la lista se abren con sus botones (ocultos), y la lista muestra cuál está activo
-const MENU_MODES = ['timeline','cmp','reg','conf'];
+const MENU_MODES = ['timeline','cmp','reg','conf','tempo'];
 document.getElementById('map-ds').addEventListener('change', e=>{ if(datasets[e.target.value]){ active = e.target.value; buildUI(); renderMap(); } });
 document.getElementById('mode-more').addEventListener('change', e=>{ const m = e.target.value; if(m) document.querySelector(`#explore .mode-btn[data-mode="${m}"]`).click(); });
 document.querySelectorAll('#explore .mode-btn').forEach(b=>b.addEventListener('click', ()=>{ const sel = document.getElementById('mode-more'); sel.value = MENU_MODES.includes(b.dataset.mode) ? b.dataset.mode : ''; sel.classList.toggle('active', !!sel.value); }));
@@ -948,6 +967,8 @@ document.getElementById('mm-ds').addEventListener('change', setupMindControls);
 document.getElementById('mm-term').addEventListener('keydown', e=>{ if(e.key==='Enter') runMind(false); });
 ['net-src','net-min'].forEach(id=>document.getElementById(id).addEventListener('change', renderNet));
 ['conf-gran','conf-actor','conf-form','conf-measure'].forEach(id=>document.getElementById(id).addEventListener('change', renderConf));
+['tp-mode','tp-gap','tp-est','tp-obsend','tp-estopen','tp-closecol','tp-linkds','tp-linkcol'].forEach(id=>document.getElementById(id).addEventListener('change', ()=>{ readTempoControls(); renderTempo(); }));
+['tp-keycols','tp-closevals'].forEach(id=>document.getElementById(id).addEventListener('change', ()=>{ readTempoControls(); renderTempo(); }));
 ['conf-unit','conf-k','conf-len','conf-ref','conf-seas'].forEach(id=>document.getElementById(id).addEventListener('change', saveConfSettings));
 ['wa-mode','wa-source'].forEach(id=>document.getElementById(id).addEventListener('change', waControls));
 document.getElementById('wa-term').addEventListener('keydown', e=>{ if(e.key==='Enter') runWords(); });
@@ -3390,6 +3411,7 @@ function buildAnnexHtml(){
     h += `<li>Indicadores por período: se cuenta la cantidad de registros (o la suma o el promedio de una columna numérica) de cada período; los períodos sin registros cuentan como cero (en promedios, sin dato). Un pico es un período que supera el promedio en más de ${fmtN(S.k,1)} desvíos estándar; un ciclo, un tramo de ${S.minLen} o más períodos seguidos por encima de ${S.ref==='mean' ? 'el promedio' : 'la mediana'}${S.seasonal ? ', ambos calculados sobre la serie ajustada por estacionalidad (valor del período menos el promedio de su mes o trimestre del año, más el promedio general)' : ''}. El índice estacional es el promedio de cada mes (o trimestre) del año dividido por el promedio general. La diversidad de la composición se mide con la equidad de Pielou (entropía de Shannon dividida por su máximo posible).</li>`; }
   { const ext = Object.values(datasets).filter(d=>d.extracted); if(ext.length) h += `<li>Registros cargados desde relatos con propuesta asistida: ${ext.map(d=>`${d.extracted} en «${esc(d.label)}»`).join('; ')}. Telar propuso cada registro a partir del texto (categorías existentes de la base, sus sinónimos y las asociaciones observadas en la base), y cada propuesta fue revisada y, cuando correspondía, corregida por la persona investigadora antes de sumarse.</li>`; }
   if(project.dictCoded){ const R = parseCodeDict(project.codeDict); h += `<li>Codificación por diccionario: ${project.dictCoded} fragmentos (oraciones) se codificaron con reglas de palabras, revisadas una por una antes de aplicarse. Reglas usadas: ${R.map(r=>`${esc(r.code)} (${r.pats.map(p=>esc(p.raw)).join(', ')})`).join('; ')}.</li>`; }
+  if(methodLog.some(e=>/^Temporalidades en /.test(e.text||''))) h += `<li>Temporalidades de los conflictos: los registros se agrupan en conflictos según la columna o la combinación de columnas indicada (las variantes de escritura de un mismo nombre se unifican), y un conflicto se separa en episodios cuando pasan más días sin registros que el umbral elegido. La duración va del primer registro al fin (registro de cierre, fin estimado por falta de registros o fecha editada a mano); cuando el fin no se conoce se informa como duración mínima y se trata como dato censurado. La duración mediana se estima con el método de Kaplan-Meier. Los días por año reparten cada duración entre los años calendario que abarca. Las ediciones manuales (nombres, fechas, estados y uniones) se guardan con el proyecto.</li>`;
   if(methodLog.some(e=>e.kind==='texto')) h += `<li>Análisis de palabras: el texto se divide en palabras (secuencias de letras, en minúsculas, sin lematizar), excluyendo las palabras vacías del español según una lista fija de ${STOP_ES.size} palabras cuando se indica. Las palabras características de cada grupo se identifican por log-verosimilitud (G², Rayson y Garside, 2000), comparando su frecuencia en el grupo con la del resto de los textos; se listan las que aparecen al menos 3 veces y proporcionalmente más en el grupo.</li>`;
   { const nOcr = Object.values(qualDocs).reduce((s,d)=>s+d.entries.filter(e=>e.ocr).length, 0);
     if(nOcr) h += `<li>Transcripción por OCR: ${nOcr} relato(s) se obtuvieron de imágenes (fotos, capturas o PDF escaneados) con ${OCR_ENGINE}, procesando por separado las zonas de texto marcadas en orden de lectura y descartando los renglones de baja confianza; el texto se revisó y corrigió manualmente antes de guardarlo. Cada relato conserva la referencia a su imagen de origen.</li>`; }
@@ -5852,6 +5874,163 @@ function wordNetwork(units, o, topN=40, minW=3){
 }
 /* ===== RED DE PALABRAS (fin) ===== */
 
+/* ===== TEMPORALIDADES DE LOS CONFLICTOS (inicio) ===== */
+// Agrupa los registros en conflictos (por una columna identificadora o una combinación de columnas), calcula inicio, fin,
+// duración y días por año, y trata los conflictos sin final conocido como datos censurados (curva de Kaplan-Meier).
+const DAY_MS = 864e5;
+const dayNum = d=>Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())/DAY_MS);
+const dayToDate = n=>{ const u = new Date(n*DAY_MS); return new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate()); };
+const fmtDay = n=>n==null ? '' : dayToDate(n).toLocaleDateString('es-AR');
+const isoDay = n=>{ const d = dayToDate(n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+function tempoKeyNorm(v){ return String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9ñ]+/g,''); }
+function tempoCfg(ds){ project.tempo = project.tempo || {}; const t = project.tempo[ds.label] = project.tempo[ds.label] || {};
+  return Object.assign(t, Object.assign({mode:'', keyCols:[], gap:90, closeCol:'', closeVals:[], estWindow:60, obsEnd:'', estAsOpen:false, linkDs:'', linkCol:'', overrides:{}}, t)); }
+// días de un intervalo [s, e] (inclusive) en cada año calendario
+function daysPerYear(s, e){ const out = {}; for(let y = dayToDate(s).getFullYear(); y <= dayToDate(e).getFullYear(); y++){
+  const ys = dayNum(new Date(y,0,1)), ye = dayNum(new Date(y,11,31)), o = Math.min(e,ye) - Math.max(s,ys) + 1; if(o>0) out[y] = o; } return out; }
+// Kaplan-Meier: proporción de conflictos que siguen abiertos después de t días; los sin final conocido cuentan como censurados
+function kaplanMeier(items){ // items: [{t, event}]
+  const times = [...new Set(items.filter(x=>x.event).map(x=>x.t))].sort((a,b)=>a-b); let S = 1; const curve = [{t:0, S:1}];
+  times.forEach(t=>{ const atRisk = items.filter(x=>x.t>=t).length, d = items.filter(x=>x.event && x.t===t).length; if(atRisk>0){ S *= (1 - d/atRisk); curve.push({t, S, atRisk, d}); } });
+  const med = curve.find(p=>p.S<=0.5); return {curve, median: med ? med.t : null};
+}
+// clave de agrupación de un registro
+function tempoKeyOf(ds, r, cfg){
+  const val = c=>{ const v = getCategories(ds, r, c).filter(x=>x && x!=='(sin dato)' && !/^-+$/.test(String(x).trim())); return v[0] || ''; };
+  if(cfg.mode && cfg.mode!=='__rule__'){ const v = val(cfg.mode); return v ? {key: tempoKeyNorm(v), label: v} : null; }
+  const parts = (cfg.keyCols||[]).map(val).filter(Boolean); if(!parts.length) return null;
+  return {key: parts.map(tempoKeyNorm).join('|'), label: parts.join(' · ')};
+}
+function tempoEpisodes(ds, rows, cfg){
+  const dates = ds.rows.map(r=>r[ds.dateCol]).filter(d=>d instanceof Date).map(dayNum);
+  const obsEnd = cfg.obsEnd ? dayNum(new Date(cfg.obsEnd+'T00:00')) : Math.max(...dates);
+  const groups = new Map();
+  rows.forEach(r=>{ const d = r[ds.dateCol]; if(!(d instanceof Date)) return; const k = tempoKeyOf(ds, r, cfg); if(!k) return;
+    if(!groups.has(k.key)) groups.set(k.key, {labels: new Map(), recs: []}); const g = groups.get(k.key); g.labels.set(k.label, (g.labels.get(k.label)||0)+1); g.recs.push({day: dayNum(d), r}); });
+  let eps = [];
+  groups.forEach((g, key)=>{
+    const name = [...g.labels.entries()].sort((a,b)=>b[1]-a[1])[0][0]; g.recs.sort((a,b)=>a.day-b.day); let cur = null;
+    g.recs.forEach(x=>{ if(!cur || x.day - cur.last > cfg.gap){ cur = {key, name, start: x.day, last: x.day, recs: []}; eps.push(cur); } cur.last = x.day; cur.recs.push(x); }); });
+  eps.forEach(e=>{ e.id = e.key+'|'+isoDay(e.start); });
+  // uniones hechas a mano
+  const ov = cfg.overrides || {};
+  eps.forEach(e=>{ const t = ov[e.id] && ov[e.id].mergedInto; if(t){ const tgt = eps.find(x=>x.id===t); if(tgt && tgt!==e){ tgt.recs = tgt.recs.concat(e.recs); tgt.start = Math.min(tgt.start, e.start); tgt.last = Math.max(tgt.last, e.last); e.merged = true; tgt.mergedNames = (tgt.mergedNames||[]).concat([e.name]); } } });
+  eps = eps.filter(e=>!e.merged);
+  eps.forEach(e=>{
+    e.recs.sort((a,b)=>a.day-b.day); e.n = e.recs.length;
+    const closing = cfg.closeCol && (cfg.closeVals||[]).length ? e.recs.filter(x=>getCategories(ds, x.r, cfg.closeCol).some(v=>cfg.closeVals.includes(v))) : [];
+    if(closing.length){ e.estado = 'cerrado'; e.end = closing[closing.length-1].day; e.why = 'registro de cierre ('+cfg.closeCol+')'; }
+    else if(obsEnd - e.last > cfg.estWindow){ e.estado = 'estimado'; e.end = e.last; e.why = `sin registros en los ${cfg.estWindow} días siguientes`; }
+    else { e.estado = 'abierto'; e.end = null; e.why = 'seguía con registros cerca del fin del período observado'; }
+    const o = ov[e.id] || {};
+    if(o.name) e.name = o.name;
+    if(o.estado){ e.estado = o.estado; e.why = 'editado a mano'; }
+    if(o.end!==undefined){ if(o.end){ e.end = dayNum(new Date(o.end+'T00:00')); if(!o.estado) e.estado = 'cerrado'; e.why = 'editado a mano'; } else { e.end = null; if(!o.estado) e.estado = 'abierto'; e.why = 'editado a mano'; } }
+    if(e.estado==='abierto') e.end = null;
+    const until = e.end!=null ? e.end : obsEnd;
+    e.dur = until - e.start + 1; e.censored = e.end==null || (e.estado==='estimado' && cfg.estAsOpen);
+    e.byYear = daysPerYear(e.start, until);
+  });
+  return {eps: eps.sort((a,b)=>a.start-b.start), obsEnd};
+}
+// vínculo con otra base (por ejemplo, intervenciones estatales): coincidencia de nombres y fechas dentro del conflicto
+function tempoLink(eps, cfg){
+  const ds2 = datasets[cfg.linkDs]; if(!ds2 || !cfg.linkCol || !ds2.dateCol) return;
+  const toks = s=>new Set(String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').split(/[^a-z0-9ñ]+/).filter(w=>w.length>=4 && !['situacion','pesquera','trabajadores','sindicato','empresa'].includes(w)));
+  const items = ds2.rows.filter(r=>r[ds2.dateCol] instanceof Date).map(r=>({day: dayNum(r[ds2.dateCol]), t: toks(getCategories(ds2, r, cfg.linkCol).join(' ')), r}));
+  eps.forEach(e=>{ const et = toks([e.name].concat(e.mergedNames||[]).join(' ')), until = e.end!=null ? e.end : Infinity;
+    const hit = items.filter(x=>x.day>=e.start && x.day<=until && [...x.t].some(w=>et.has(w))).sort((a,b)=>a.day-b.day);
+    e.links = hit.length; e.firstLink = hit.length ? hit[0].day - e.start : null; });
+}
+const TEMPO_EST = {cerrado:'Cerrado', estimado:'Fin estimado', abierto:'Sin final conocido'};
+function setupTempoControls(){
+  const ds = datasets[active]; if(!ds) return; const cfg = tempoCfg(ds), cats = catColumns(ds).filter(c=>!isPeriodCol(c));
+  if(!cfg.mode && !cfg.keyCols.length){ const id = cats.find(c=>/conflicto|\bcaso\b|\bid\b|identificador/i.test(c)); /* "motivo" solo no identifica un conflicto */ if(id) cfg.mode = id; else { cfg.mode = '__rule__'; cfg.keyCols = cats.filter(c=>/empresa|organiz|sindic|actor/i.test(c)).slice(0,2); } }
+  const m = document.getElementById('tp-mode'); m.innerHTML = cats.map(c=>`<option value="${esc(c)}">la columna «${esc(c)}»</option>`).join('') + '<option value="__rule__">una combinación de columnas…</option>'; m.value = cfg.mode;
+  const kc = document.getElementById('tp-keycols'); kc.style.display = cfg.mode==='__rule__' ? 'flex' : 'none';
+  kc.innerHTML = cats.map(c=>`<label class="chk-opt"><input type="checkbox" class="tp-kc" value="${esc(c)}" ${cfg.keyCols.includes(c) ? 'checked' : ''}> ${esc(c)}</label>`).join('');
+  document.getElementById('tp-gap').value = cfg.gap; document.getElementById('tp-est').value = cfg.estWindow; document.getElementById('tp-obsend').value = cfg.obsEnd || ''; document.getElementById('tp-estopen').checked = !!cfg.estAsOpen;
+  const cc = document.getElementById('tp-closecol'); cc.innerHTML = '<option value="">— no se marca el cierre —</option>' + cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join(''); cc.value = cfg.closeCol;
+  const cv = document.getElementById('tp-closevals');
+  if(cfg.closeCol){ const vals = countBy(ds.rows, cfg.closeCol, 60).map(x=>x[0]).filter(v=>v!=='(sin dato)'); cv.innerHTML = '<span class="hint" style="margin:0">Se da por terminado cuando toma alguno de estos valores:</span> ' + vals.map(v=>`<label class="chk-opt"><input type="checkbox" class="tp-cv" value="${esc(v)}" ${cfg.closeVals.includes(v) ? 'checked' : ''}> ${esc(v)}</label>`).join(''); cv.style.display = 'flex'; } else { cv.innerHTML = ''; cv.style.display = 'none'; }
+  const lk = document.getElementById('tp-linkds'); lk.innerHTML = '<option value="">— ninguna —</option>' + Object.keys(datasets).filter(k=>k!==active && datasets[k].dateCol).map(k=>`<option value="${esc(k)}">${esc(datasets[k].label)}</option>`).join(''); lk.value = datasets[cfg.linkDs] ? cfg.linkDs : '';
+  const lc = document.getElementById('tp-linkcol'); const ds2 = datasets[lk.value]; lc.style.display = ds2 ? '' : 'none';
+  lc.innerHTML = ds2 ? catColumns(ds2).map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('') : ''; if(ds2){ lc.value = catColumns(ds2).includes(cfg.linkCol) ? cfg.linkCol : (catColumns(ds2).find(c=>/conflicto|motivo|empresa/i.test(c)) || catColumns(ds2)[0]); cfg.linkCol = lc.value; }
+}
+function readTempoControls(){
+  const ds = datasets[active], cfg = tempoCfg(ds);
+  cfg.mode = document.getElementById('tp-mode').value; cfg.keyCols = [...document.querySelectorAll('.tp-kc:checked')].map(c=>c.value);
+  cfg.gap = Math.max(1, +document.getElementById('tp-gap').value || 90); cfg.estWindow = Math.max(1, +document.getElementById('tp-est').value || 60);
+  cfg.obsEnd = document.getElementById('tp-obsend').value || ''; cfg.estAsOpen = document.getElementById('tp-estopen').checked;
+  const cc = document.getElementById('tp-closecol').value; if(cc!==cfg.closeCol){ cfg.closeCol = cc; cfg.closeVals = []; } else cfg.closeVals = [...document.querySelectorAll('.tp-cv:checked')].map(c=>c.value);
+  cfg.linkDs = document.getElementById('tp-linkds').value; cfg.linkCol = document.getElementById('tp-linkcol').value;
+  persistSession();
+}
+function renderTempo(){
+  setupTempoControls();
+  const ds = datasets[active], out = document.getElementById('tp-out'); if(!ds) return;
+  if(!ds.dateCol){ out.innerHTML = '<p class="empty">Para las temporalidades hace falta una columna de fecha.</p>'; return; }
+  const cfg = tempoCfg(ds);
+  if(cfg.mode==='__rule__' && !cfg.keyCols.length){ out.innerHTML = '<p class="empty">Marcá las columnas que identifican a cada conflicto (por ejemplo, Empresa y Organización).</p>'; return; }
+  const {eps: all, obsEnd} = tempoEpisodes(ds, getFiltered(), cfg); tempoLink(all, cfg);
+  if(!all.length){ out.innerHTML = '<p class="empty">No hay registros con fecha e identificación de conflicto en los filtros actuales.</p>'; return; }
+  // filtros de la lista de conflictos
+  const years = [...new Set(all.flatMap(e=>Object.keys(e.byYear)))].sort();
+  const F = cfg.filters = cfg.filters || {year:'', estado:'', min:'', q:''};
+  const eps = all.filter(e=>(!F.year || e.byYear[F.year]) && (!F.estado || e.estado===F.estado) && (!F.min || e.dur >= +F.min) && (!F.q || bibNorm(e.name).includes(bibNorm(F.q))));
+  const km = kaplanMeier(eps.map(e=>({t: e.dur, event: !e.censored}))), closed = eps.filter(e=>!e.censored);
+  const meanClosed = closed.length ? closed.reduce((a,e)=>a+e.dur,0)/closed.length : null;
+  const yearDays = {}, yearN = {}; eps.forEach(e=>Object.entries(e.byYear).forEach(([y,n])=>{ yearDays[y] = (yearDays[y]||0)+n; yearN[y] = (yearN[y]||0)+1; }));
+  const ys = Object.keys(yearDays).sort();
+  const cnt = k=>eps.filter(e=>e.estado===k).length;
+  let html = `<div class="adv-controls" style="margin:4px 0 8px">
+      <div class="field"><label>Activos en el año</label><select id="tpf-year"><option value="">Todos</option>${years.map(y=>`<option ${F.year===y ? 'selected' : ''}>${y}</option>`).join('')}</select></div>
+      <div class="field"><label>Estado</label><select id="tpf-estado"><option value="">Todos</option>${Object.entries(TEMPO_EST).map(([k,l])=>`<option value="${k}" ${F.estado===k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+      <div class="field"><label>Duración mínima (días)</label><input type="number" id="tpf-min" min="1" value="${esc(F.min)}" style="width:90px"></div>
+      <div class="field" style="flex:1"><label>Buscar conflicto</label><input type="text" id="tpf-q" value="${esc(F.q)}" placeholder="ej. Kaleu"></div></div>
+    <p style="margin:6px 0"><strong>${eps.length}</strong> conflictos${eps.length<all.length ? ` (de ${all.length})` : ''}: ${cnt('cerrado')} cerrados, ${cnt('estimado')} con fin estimado y ${cnt('abierto')} sin final conocido. Período observado hasta el ${fmtDay(obsEnd)}.
+      Duración mediana (Kaplan-Meier): <strong>${km.median!=null ? km.median+' días' : 'no se alcanza'}</strong>${km.median==null ? ' (más de la mitad de los conflictos sigue sin final conocido)' : ''}. ${meanClosed!=null ? `Duración promedio de los ${closed.length} con final: ${fmtN(meanClosed,1)} días.` : ''} ${glLink('temporalidad','¿Cómo se calculan?')}</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px"><div class="chart-box" style="height:240px"><canvas id="c-tp-year"></canvas></div><div class="chart-box" style="height:240px"><canvas id="c-tp-km"></canvas></div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 6px"><button type="button" class="mini-export" id="tp-merge">Unir los conflictos marcados</button><button type="button" class="mini-export" id="tp-reset">Deshacer las ediciones</button><button type="button" class="mini-export" id="tp-xlsx">⭳ Excel</button><button type="button" class="mini-export" id="tp-report">📌 Agregar al informe</button></div>
+    <div class="tablewrap" style="max-height:460px;overflow:auto"><table class="tp-table"><thead><tr><th title="Marcá dos o más para unirlos">Unir</th><th>Conflicto</th><th>Inicio</th><th>Último registro</th><th>Fin</th><th>Estado</th><th>Duración</th><th>Registros</th><th>Días por año</th>${cfg.linkDs ? '<th>Intervenciones</th><th>Días hasta la primera</th>' : ''}</tr></thead><tbody>
+    ${eps.map(e=>`<tr data-id="${esc(e.id)}"><td><input type="checkbox" class="tp-sel"></td><td><input type="text" class="tp-name" value="${esc(e.name)}" title="${esc((e.mergedNames||[]).length ? 'Unido con: '+e.mergedNames.join(', ') : '')}"></td><td>${fmtDay(e.start)}</td><td>${fmtDay(e.last)}</td>
+      <td><input type="date" class="tp-end" value="${e.end!=null ? isoDay(e.end) : ''}" title="Vacío: sin final conocido"></td>
+      <td><select class="tp-st" title="${esc(e.why)}">${Object.entries(TEMPO_EST).map(([k,l])=>`<option value="${k}" ${e.estado===k ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
+      <td>${e.censored ? '≥ ' : ''}${e.dur}</td><td>${e.n}</td><td style="font-size:.78rem">${Object.entries(e.byYear).map(([y,n])=>`${y}: ${n}`).join(' · ')}</td>
+      ${cfg.linkDs ? `<td>${e.links||0}</td><td>${e.firstLink!=null ? e.firstLink : '—'}</td>` : ''}</tr>`).join('')}</tbody></table></div>
+    <p class="hint">Duración: días desde el primer registro hasta el fin (o hasta el fin del período observado, con "≥", si no se conoce el final). Podés cambiar el nombre, la fecha de fin y el estado de cada conflicto, y unir conflictos; las ediciones se guardan con el proyecto.</p>`;
+  out.innerHTML = html;
+  destroyChart('c-tp-year'); destroyChart('c-tp-km');
+  charts['c-tp-year'] = new Chart(document.getElementById('c-tp-year'), {type:'bar', data:{labels: ys, datasets:[{label:'Días de conflicto', data: ys.map(y=>yearDays[y]), backgroundColor:'#2F6B6E', yAxisID:'y'}, {type:'line', label:'Conflictos activos', data: ys.map(y=>yearN[y]), borderColor:'#B5533C', backgroundColor:'#B5533C', yAxisID:'y1'}]},
+    options:{maintainAspectRatio:false, plugins:{title:{display:true, text:'Días de conflicto y conflictos activos por año'}}, scales:{y:{beginAtZero:true, title:{display:true, text:'Días'}}, y1:{beginAtZero:true, position:'right', grid:{drawOnChartArea:false}, title:{display:true, text:'Conflictos'}}}}});
+  // eje de días proporcional (no de categorías), para que la forma de la curva sea fiel
+  charts['c-tp-km'] = new Chart(document.getElementById('c-tp-km'), {type:'line', data:{datasets:[{label:'Proporción que sigue abierta', data: km.curve.map(p=>({x: p.t, y: Math.round(p.S*1000)/10})), stepped:true, borderColor:'#1F4C4E', pointRadius:0, fill:false}]},
+    options:{maintainAspectRatio:false, parsing:true, plugins:{title:{display:true, text:'Curva de duración (Kaplan-Meier)'}, legend:{display:false}}, scales:{x:{type:'linear', min:0, title:{display:true, text:'Días desde el inicio'}}, y:{min:0, max:100, title:{display:true, text:'% que sigue abierto'}}}}});
+  const save = ()=>{ persistSession(); renderTempo(); };
+  const ovOf = id=>cfg.overrides[id] = cfg.overrides[id] || {};
+  out.querySelectorAll('.tp-name').forEach(i=>i.addEventListener('change', ()=>{ ovOf(i.closest('tr').dataset.id).name = i.value.trim(); save(); }));
+  out.querySelectorAll('.tp-end').forEach(i=>i.addEventListener('change', ()=>{ ovOf(i.closest('tr').dataset.id).end = i.value; save(); }));
+  out.querySelectorAll('.tp-st').forEach(i=>i.addEventListener('change', ()=>{ const o = ovOf(i.closest('tr').dataset.id); o.estado = i.value; if(i.value==='abierto') o.end = ''; save(); }));
+  const fl = ()=>{ F.year = document.getElementById('tpf-year').value; F.estado = document.getElementById('tpf-estado').value; F.min = document.getElementById('tpf-min').value; F.q = document.getElementById('tpf-q').value; save(); };
+  ['tpf-year','tpf-estado','tpf-min'].forEach(id=>document.getElementById(id).addEventListener('change', fl));
+  document.getElementById('tpf-q').addEventListener('change', fl);
+  document.getElementById('tp-merge').onclick = ()=>{ const ids = [...out.querySelectorAll('.tp-sel:checked')].map(c=>c.closest('tr').dataset.id); if(ids.length<2){ alert('Marcá al menos dos conflictos para unirlos.'); return; }
+    const target = eps.filter(e=>ids.includes(e.id)).sort((a,b)=>a.start-b.start)[0].id; ids.filter(id=>id!==target).forEach(id=>{ ovOf(id).mergedInto = target; });
+    logEvent('modelos', `Temporalidades en «${ds.label}»: se unieron ${ids.length} conflictos en uno.`); save(); };
+  document.getElementById('tp-reset').onclick = ()=>{ if(!confirm('¿Deshacer todas las ediciones de nombres, fechas, estados y uniones?')) return; cfg.overrides = {}; save(); };
+  const title = `Temporalidades de los conflictos: ${ds.label}`;
+  const note = `Conflictos identificados por ${cfg.mode==='__rule__' ? 'la combinación de '+cfg.keyCols.join(', ') : '«'+cfg.mode+'»'}; un mismo conflicto se separa en episodios si pasan más de ${cfg.gap} días sin registros. ${cfg.closeCol && cfg.closeVals.length ? `Se da por cerrado con «${cfg.closeCol}» = ${cfg.closeVals.join(', ')}. ` : ''}Fin estimado: sin registros en los ${cfg.estWindow} días siguientes${cfg.estAsOpen ? ' (tratado como final desconocido)' : ''}. Duración mediana estimada con Kaplan-Meier, con los conflictos sin final conocido como censurados.`;
+  document.getElementById('tp-xlsx').onclick = ()=>downloadXLSX(xlsxName('temporalidades_'+ds.label), [
+    {name:'Conflictos', aoa: [['Conflicto','Inicio','Último registro','Fin','Estado','Duración (días)','Final conocido','Registros'].concat(ys.map(y=>'Días '+y), cfg.linkDs ? ['Intervenciones','Días hasta la primera intervención'] : [])].concat(eps.map(e=>[e.name, fmtDay(e.start), fmtDay(e.last), e.end!=null ? fmtDay(e.end) : '', TEMPO_EST[e.estado], e.dur, e.censored ? 'no (duración mínima)' : 'sí', e.n].concat(ys.map(y=>e.byYear[y]||0), cfg.linkDs ? [e.links||0, e.firstLink!=null ? e.firstLink : ''] : []))) },
+    {name:'Por año', aoa: [['Año','Días de conflicto','Conflictos activos']].concat(ys.map(y=>[y, yearDays[y], yearN[y]]))},
+    {name:'Kaplan-Meier', aoa: [['Días','Proporción que sigue abierta','En riesgo','Cierres']].concat(km.curve.map(p=>[p.t, round2(p.S), p.atRisk||'', p.d||'']))}], [title, note]);
+  document.getElementById('tp-report').onclick = ()=>addToReport({type:'chart', title, imageDataURL: charts['c-tp-year'].toBase64Image(), citation: note+' Calculado con "'+APP_LABEL+'" el '+new Date().toLocaleString('es-AR')+'.'});
+  // al registro metodológico solo cuando cambian los criterios (no en cada edición o filtro)
+  const sig = JSON.stringify([cfg.mode, cfg.keyCols, cfg.gap, cfg.closeCol, cfg.closeVals, cfg.estWindow, cfg.obsEnd, cfg.estAsOpen, cfg.linkDs]);
+  if(cfg.__logged!==sig){ cfg.__logged = sig; logEvent('modelos', `Temporalidades en «${ds.label}»: ${all.length} conflictos. ${note}`); }
+}
+/* ===== TEMPORALIDADES (fin) ===== */
+
 /* ===== OCR: texto desde imágenes, fotos y PDF escaneados (inicio) ===== */
 // Motor: Tesseract (incluido en vendor/tesseract, se descarga solo la primera vez que se usa).
 // Todo se procesa en la computadora: las imágenes no se envían a ningún servidor.
@@ -6535,7 +6714,7 @@ function moduleOn(k){ return !(project.modules && project.modules[k]===false); }
 function applyModules(){
   MODULES.forEach(([k,,tab])=>{ if(tab){ const b = document.getElementById(tab); if(b) b.hidden = !moduleOn(k); } });
   const modeBtn = m=>document.querySelector(`#explore .mode-btn[data-mode="${m}"]`);
-  [['conf','conflicto'],['net','conflicto'],['cmp','encuesta'],['reg','encuesta']].forEach(([m,k])=>{ const b = modeBtn(m); if(b) b.hidden = !moduleOn(k); const o = document.querySelector(`#mode-more option[value="${m}"]`); if(o) o.hidden = !moduleOn(k); });
+  [['conf','conflicto'],['tempo','conflicto'],['net','conflicto'],['cmp','encuesta'],['reg','encuesta']].forEach(([m,k])=>{ const b = modeBtn(m); if(b) b.hidden = !moduleOn(k); const o = document.querySelector(`#mode-more option[value="${m}"]`); if(o) o.hidden = !moduleOn(k); });
   const cur = document.querySelector('.main-tab[aria-selected="true"]'); if(cur && cur.hidden) showMainPanel('graficos');
   const am = document.querySelector('#explore .mode-btn.active'); if(am && am.hidden && modeBtn('quick')) modeBtn('quick').click();
 }
@@ -7692,11 +7871,13 @@ document.querySelectorAll('#explore .mode-btn').forEach(b=>{ // solo los modos d
     document.getElementById('reg-view').style.display = m==='reg' ? 'block':'none';
     document.getElementById('net-view').style.display = m==='net' ? 'block':'none';
     document.getElementById('conf-view').style.display = m==='conf' ? 'block':'none';
+    document.getElementById('tempo-view').style.display = m==='tempo' ? 'block':'none';
     if(m==='cross') renderCross();
     if(m==='quality') renderQuality();
     if(m==='timeline') renderTimeline();
     if(m==='net') renderNet();
     if(m==='conf') renderConf();
+    if(m==='tempo') renderTempo();
   };
 });
 
@@ -8868,6 +9049,7 @@ function setupHelp(){
   });
 }
 const GLOSSARY = [
+  ['temporalidad','Temporalidades y duración de los conflictos','Cada conflicto se arma con sus registros: por una columna que lo identifica (por ejemplo, CONFLICTO/MOTIVO) o por una combinación de columnas (por ejemplo, Empresa y Organización). Si pasan muchos días sin registros, se separa en episodios. Su duración va del primer registro al fin. Si el fin no se conoce, la duración se informa como mínima ("≥") y el conflicto cuenta como dato censurado: no se descarta ni se lo da por terminado. La curva de Kaplan-Meier usa todos los conflictos para estimar qué proporción sigue abierta después de cierta cantidad de días; la duración mediana es el día en que esa proporción baja de la mitad. Los días por año reparten la duración de cada conflicto entre los años que abarca.'],
   ['diccionario','Codificación por diccionario','Reglas del tipo "Despidos: despid*, cesant*" que proponen un código para cada oración donde aparece alguna de esas palabras (el asterisco incluye todas las terminaciones; las comillas, una frase exacta). Sirve para codificar rápido temas que se nombran de forma explícita, no para interpretar. Antes de aplicar, conviene compararlas con una parte ya codificada a mano: si el kappa es bajo, las reglas no reproducen el criterio y hay que ajustarlas. Las propuestas siempre se revisan antes de aplicarse.'],
   ['redpalabras','Red de palabras','Muestra qué palabras aparecen juntas en las mismas oraciones, entre las más frecuentes. Los grupos de palabras muy conectadas suelen corresponder a temas; las palabras con intermediación alta conectan temas distintos. Es exploratoria: orienta la lectura, no la reemplaza.'],
   ['extraccion','Pasar relatos a una base (propuesta asistida)','Telar lee cada relato y propone un registro usando solo las categorías que ya tiene la base. Reconoce cada categoría por su nombre, por las raíces de sus palabras y por sinónimos (editables); las formas compuestas se arman por partes ("Huelga y Piquete (Planta)"). Si un campo no aparece en el texto, usa lo que la base sabe (por ejemplo, la localidad habitual de una empresa) o el valor habitual de la columna, y lo indica con otro color. Los nombres de categorías que aparecen en casi todos los relatos no se usan para distinguir. "Medir con mis datos" compara la propuesta con los registros ya cargados de la misma fecha. Es una ayuda para cargar más rápido: cada registro se revisa antes de sumarlo.'],
