@@ -1,0 +1,11 @@
+{
+  "name": "telar-pruebas",
+  "private": true,
+  "description": "Pruebas automáticas del motor estadístico y los lectores de archivos de Telar",
+  "scripts": {
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "acorn": "^8.14.0"
+  }
+}

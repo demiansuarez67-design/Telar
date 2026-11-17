@@ -1,0 +1,19 @@
+# Corre las pruebas del motor estadístico cada vez que se sube un cambio o se propone una mejora.
+# El resultado aparece en la pestaña "Actions" del repositorio (✔ verde: todo bien; ✖ rojo: algo cambió un resultado).
+name: Pruebas del motor estadístico
+on:
+  push:
+  pull_request:
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pruebas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm test
